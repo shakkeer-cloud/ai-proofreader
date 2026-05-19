@@ -355,6 +355,7 @@
       <div class="report-header-left">
         <div class="report-title">Proofreading Report</div>
         <div class="report-meta" id="report-meta"></div>
+        <div id="report-cost" style="display:none;font-size:11px;color:var(--muted);margin-top:3px;"></div>
       </div>
       <div class="score-wrap" id="score-wrap" style="display:none">
         <div class="score-circle" id="score-circle">
@@ -451,6 +452,15 @@ const GRADE_CONFIG = [
   [60,'D','#f97316','Needs Work'], [0,'F','#ef4444','Poor'],
 ];
 const CHAR_LIMIT = 140000;
+const MODEL_PRICING = {
+  'claude-sonnet-4-6':       { in: 3.00,  out: 15.00 },
+  'claude-opus-4-7':         { in: 15.00, out: 75.00 },
+  'claude-haiku-4-5-20251001':{ in: 0.80,  out: 4.00  },
+};
+function calcCost(model, inputTok, outputTok) {
+  const p = MODEL_PRICING[model] || { in: 3.00, out: 15.00 };
+  return (inputTok * p.in + outputTok * p.out) / 1_000_000;
+}
 
 // ══════════════════════════════════════════════
 // State
@@ -761,6 +771,7 @@ function runDemo() {
       {id:10,type:'Clarity',severity:'Minor',page:4,context:'Once activated, the system does the thing automatically for all users.',original:'does the thing',corrected:'processes requests',explanation:'"Does the thing" is vague — specify the action performed.'},
     ],
   };
+  demo._inputTok=1840; demo._outputTok=620; demo._model='claude-sonnet-4-6'; demo._cost=calcCost('claude-sonnet-4-6',1840,620);
   lastReport=demo; lastExtractedText='Demo document text — corrected version not available.';
   renderReport(demo); showTab('report');
   toast('Demo loaded — no API call made.');
@@ -871,6 +882,12 @@ Return ONLY valid JSON (no markdown):
     const report = JSON.parse(raw);
     if (!report.word_count && docInfo.wordCount) report.word_count = docInfo.wordCount;
     if (docInfo.pageTexts.length) report.errors.forEach(e=>{ if(!e.page) e.page=findPage(e.original)||findPage(e.context); });
+    if (data.usage) {
+      report._inputTok  = data.usage.input_tokens  || 0;
+      report._outputTok = data.usage.output_tokens || 0;
+      report._model     = model;
+      report._cost      = calcCost(model, report._inputTok, report._outputTok);
+    }
 
     lastReport = report;
     saveToHistory(report);
@@ -900,6 +917,16 @@ function renderReport(r) {
   if (docInfo.pages) parts.push(`${docInfo.pages} pages`);
   if (docInfo.filename) parts.push(docInfo.filename);
   document.getElementById('report-meta').textContent=parts.join(' · ');
+
+  // AI cost
+  const costEl=document.getElementById('report-cost');
+  if (r._cost != null) {
+    const usd = r._cost < 0.01 ? `$${r._cost.toFixed(4)}` : `$${r._cost.toFixed(3)}`;
+    costEl.textContent=`AI cost: ${usd} · ${(r._inputTok||0).toLocaleString()} in + ${(r._outputTok||0).toLocaleString()} out tokens`;
+    costEl.style.display='block';
+  } else {
+    costEl.style.display='none';
+  }
 
   // Score
   const score=calculateScore(r);
