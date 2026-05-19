@@ -1448,7 +1448,7 @@ async function downloadPDF() {
     if (lastReport._cost) { doc.setFontSize(7); gg(150); doc.text(`AI cost: $${lastReport._cost.toFixed(4)}`,ML,y+2); y+=3; }
     y+=4; ln(y); y+=5;
 
-    // Summary
+    // Summary by type
     doc.setFont('helvetica','bold'); doc.setFontSize(10); gg(30);
     doc.text('Summary by type',ML,y); y+=5;
     doc.setFontSize(8); let sx=ML;
@@ -1461,12 +1461,28 @@ async function downloadPDF() {
       sx+=tw+doc.getTextWidth(String(cnt))+10;
       if(sx>PW-MR-30){sx=ML;y+=5;}
     });
+    // Summary by severity
+    y+=6;
+    const sevCounts={Critical:0,Moderate:0,Minor:0};
+    (lastReport.errors||[]).forEach(e=>{if(e.severity&&sevCounts[e.severity]!==undefined)sevCounts[e.severity]++;});
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); gg(30);
+    doc.text('Summary by severity',ML,y); y+=5;
+    doc.setFontSize(8); let sx2=ML;
+    [['Critical','#ef4444'],['Moderate','#f97316'],['Minor','#94a3b8']].forEach(([sev,hex])=>{
+      const cnt=sevCounts[sev];
+      const [r2,g2,b2]=rgb(hex);
+      doc.setFont('helvetica','bold'); gc(r2,g2,b2); const tw=doc.getTextWidth(`${sev}: `);
+      doc.text(`${sev}: `,sx2,y);
+      doc.setFont('helvetica','normal'); gg(40); doc.text(String(cnt),sx2+tw,y);
+      sx2+=tw+doc.getTextWidth(String(cnt))+12;
+    });
     y+=8; ln(y); y+=5;
 
     // Table
     const hasPages=lastReport.errors.some(e=>e.page);
-    // Cols: #, Type, Sev, [Pg], Original, Corrected, Explanation
-    const COLS=hasPages?[8,20,16,10,38,38,42]:[8,20,16,44,44,50];
+    // Cols: #, Type, Sev, [Pg], Original, Corrected — Explanation uses remaining space
+    const COLS_BASE=hasPages?[8,20,16,10,38,38]:[8,20,16,44,44];
+    const COLS=[...COLS_BASE,CW-COLS_BASE.reduce((a,b)=>a+b,0)];
     const HEADS=hasPages?['#','Type','Sev','Pg','Original','Corrected','Explanation']:['#','Type','Sev','Original','Corrected','Explanation'];
     doc.setFont('helvetica','bold'); doc.setFontSize(7.5); gg(100);
     let cx=ML; HEADS.forEach((h,i)=>{ doc.text(h,cx,y); cx+=COLS[i]; });
@@ -1511,15 +1527,19 @@ async function downloadWord() {
   if (typeof docx==='undefined') { toast('Word library not loaded — reload the page.','err'); return; }
   toast('Generating Word document…');
   try {
-    const {Document,Paragraph,Table,TableRow,TableCell,TextRun,HeadingLevel,WidthType,AlignmentType,BorderStyle,Packer}=docx;
+    const {Document,Paragraph,Table,TableRow,TableCell,TextRun,WidthType,BorderStyle,Packer}=docx;
     const r=lastReport, hasPages=r.errors.some(e=>e.page);
     const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const score=calculateScore(r); const [,grade,,label]=getGrade(score);
     const hexToDocx=(hex)=>hex.replace('#','');
     const SEV_HEX={'Critical':'ef4444','Moderate':'f97316','Minor':'94a3b8'};
-    const noBorder={top:{style:BorderStyle.NONE,size:0},bottom:{style:BorderStyle.NONE,size:0},left:{style:BorderStyle.NONE,size:0},right:{style:BorderStyle.NONE,size:0}};
-    const cell=(txt,opts={})=>new TableCell({borders:noBorder,shading:{fill:'FFFFFF'},children:[new Paragraph({children:[new TextRun({text:String(txt||''),bold:!!opts.bold,color:opts.color||'111111',size:opts.size||18,italics:!!opts.italic})]})]});
-    const hCell=(txt)=>new TableCell({shading:{fill:'F0F0F0'},borders:{top:{style:BorderStyle.SINGLE,size:4,color:'CCCCCC'},bottom:{style:BorderStyle.SINGLE,size:4,color:'CCCCCC'},left:{style:BorderStyle.NONE,size:0},right:{style:BorderStyle.NONE,size:0}},children:[new Paragraph({children:[new TextRun({text:txt,bold:true,size:16,color:'444444'})]})]});
+    const FONT='Arial';
+    const lb={style:BorderStyle.SINGLE,size:1,color:'E5E5E5'};
+    const brd={top:lb,bottom:lb,left:lb,right:lb};
+    const cm={top:80,bottom:80,left:120,right:120};
+    const cell=(txt,opts={})=>new TableCell({borders:brd,margins:cm,shading:{fill:'FFFFFF'},children:[new Paragraph({children:[new TextRun({text:String(txt||''),bold:!!opts.bold,color:opts.color||'111111',size:opts.size||16,italics:!!opts.italic,font:FONT})]})]});
+    const hCell=(txt)=>new TableCell({shading:{fill:'F5F5F5'},borders:brd,margins:cm,children:[new Paragraph({children:[new TextRun({text:txt,bold:true,size:14,color:'444444',font:FONT})]})]});
+    const p=(txt,opts={})=>new Paragraph({children:[new TextRun({text:txt,bold:!!opts.bold,size:opts.size||16,color:opts.color||'222222',font:FONT})],spacing:{after:opts.after??80}});
     const cols=hasPages?['#','Type','Severity','Pg','Original','Corrected','Explanation']:['#','Type','Severity','Original','Corrected','Explanation'];
     const hRow=new TableRow({children:cols.map(h=>hCell(h))});
     const dRows=r.errors.map(e=>new TableRow({children:[
@@ -1531,24 +1551,31 @@ async function downloadWord() {
       cell(e.corrected||'',{bold:true,color:'006633'}),
       cell(e.explanation||'',{color:'444444'}),
     ]}));
-    const sumPs=ALL_TYPES.filter(t=>(r.summary[t]||0)>0).map(t=>new Paragraph({children:[new TextRun({text:`${t}: `,bold:true,color:hexToDocx(TYPE_COLORS[t])}),new TextRun({text:String(r.summary[t]),color:'222222'})],spacing:{after:60}}));
-    const costLine=r._cost?[new Paragraph({children:[new TextRun({text:`AI cost: $${r._cost.toFixed(4)}`,color:'94a3b8',size:16})],spacing:{after:120}})] :[];
-    const wordDoc=new Document({sections:[{children:[
-      new Paragraph({children:[new TextRun({text:'Explorer AI Proofreader',bold:true,size:28,color:'0e0e09'})],spacing:{after:40}}),
-      new Paragraph({children:[new TextRun({text:'Professional proofreading · Powered by Claude',size:16,color:'888888'})],spacing:{after:240}}),
-      new Paragraph({text:'Proofreading Report',heading:HeadingLevel.HEADING_1,spacing:{after:120}}),
-      new Paragraph({children:[new TextRun({text:[date,r.language||docInfo.language||'',`${(r.word_count||docInfo.wordCount||0).toLocaleString()} words`,`${r.summary.total_errors} issues`,`Score: ${score}/100 (${grade} — ${label})`].filter(Boolean).join('   ·   '),color:'6b7280',size:18})],spacing:{after:80}}),
-      ...(docInfo.filename?[new Paragraph({children:[new TextRun({text:docInfo.filename,color:'888888',size:16})],spacing:{after:80}})]:[]),
-      ...costLine,
-      new Paragraph({text:'Summary',heading:HeadingLevel.HEADING_2,spacing:{after:80}}),
-      new Paragraph({children:[new TextRun({text:`Total issues: ${r.summary.total_errors}`,bold:true})],spacing:{after:80}}),
-      ...sumPs,
-      new Paragraph({text:'',spacing:{after:200}}),
-      new Paragraph({text:'Error Details',heading:HeadingLevel.HEADING_2,spacing:{after:120}}),
-      new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[hRow,...dRows]}),
-      new Paragraph({text:'',spacing:{after:400}}),
-      new Paragraph({children:[new TextRun({text:'Generated by Explorer AI Proofreader · Powered by Anthropic Claude',color:'94a3b8',size:16})]}),
-    ]}]});
+    const sumPs=ALL_TYPES.filter(t=>(r.summary[t]||0)>0).map(t=>new Paragraph({children:[new TextRun({text:`${t}: `,bold:true,color:hexToDocx(TYPE_COLORS[t]),font:FONT,size:16}),new TextRun({text:String(r.summary[t]),color:'222222',font:FONT,size:16})],spacing:{after:60}}));
+    const sevCounts={Critical:0,Moderate:0,Minor:0};
+    r.errors.forEach(e=>{if(e.severity&&sevCounts[e.severity]!==undefined)sevCounts[e.severity]++;});
+    const sevPs=[new Paragraph({children:['Critical','Moderate','Minor'].flatMap(sev=>[new TextRun({text:`${sev}: `,bold:true,color:SEV_HEX[sev],font:FONT,size:16}),new TextRun({text:`${sevCounts[sev]}   `,color:'222222',font:FONT,size:16})]),spacing:{after:60}})];
+    const costLine=r._cost?[p(`AI cost: $${r._cost.toFixed(4)}`,{size:13,color:'94a3b8',after:120})] :[];
+    const wordDoc=new Document({sections:[{
+      properties:{page:{margin:{top:720,bottom:720,left:900,right:900}}},
+      children:[
+        p('Explorer AI Proofreader',{bold:true,size:25,color:'0e0e09',after:40}),
+        p('Professional proofreading · Powered by Claude',{size:14,color:'888888',after:200}),
+        p('Proofreading Report',{bold:true,size:28,color:'111111',after:120}),
+        p([date,r.language||docInfo.language||'',`${(r.word_count||docInfo.wordCount||0).toLocaleString()} words`,`${r.summary.total_errors} issues`,`Score: ${score}/100 (${grade} — ${label})`].filter(Boolean).join('   ·   '),{size:16,color:'6b7280',after:80}),
+        ...(docInfo.filename?[p(docInfo.filename,{size:14,color:'888888',after:80})]:[]),
+        ...costLine,
+        p('Summary',{bold:true,size:22,color:'111111',after:80}),
+        p(`Total issues: ${r.summary.total_errors}`,{bold:true,size:16,after:80}),
+        ...sumPs,
+        ...sevPs,
+        new Paragraph({spacing:{after:200}}),
+        p('Error Details',{bold:true,size:22,color:'111111',after:120}),
+        new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[hRow,...dRows]}),
+        new Paragraph({spacing:{after:400}}),
+        p('Generated by Explorer AI Proofreader · Powered by Anthropic Claude',{size:13,color:'94a3b8',after:0}),
+      ]
+    }]});
     const blob=await Packer.toBlob(wordDoc);
     dlBlob(blob,`proofreading-report-${Date.now()}.docx`);
     toast('Word document downloaded!');
