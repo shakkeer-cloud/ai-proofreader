@@ -153,10 +153,22 @@
     .stat-num { font-size:24px; font-weight:700; margin-bottom:3px; }
     .stat-lbl { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
 
-    /* ── Filter bar ── */
-    .filter-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+    /* ── Filter bars ── */
+    .filter-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+    .sev-filter-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+    .sev-filter-label { font-size:9px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-right:2px; }
     .filter-btn { padding:4px 12px; border-radius:20px; font-size:10px; font-weight:700; border:1px solid var(--border); background:var(--sf2); color:var(--muted); cursor:pointer; transition:all .15s; }
     .filter-btn.on { color:white; border-color:transparent; }
+    .sev-btn { padding:3px 10px; border-radius:20px; font-size:9px; font-weight:700; border:1px solid var(--border); background:var(--sf2); color:var(--muted); cursor:pointer; transition:all .15s; }
+    .sev-btn.on { color:white; border-color:transparent; }
+
+    /* ── Export dropdown ── */
+    .export-dropdown { position:relative; }
+    .export-menu { display:none; position:absolute; right:0; top:calc(100% + 4px); background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.3); z-index:100; min-width:175px; overflow:hidden; }
+    .export-menu.open { display:block; }
+    .export-menu button { display:flex; align-items:center; gap:9px; width:100%; background:none; border:none; color:var(--text); font-size:12px; font-weight:500; padding:9px 14px; cursor:pointer; text-align:left; transition:background .1s; }
+    .export-menu button:hover { background:var(--sf2); }
+    .export-menu .menu-divider { height:1px; background:var(--border); margin:3px 0; }
 
     /* ── Error table ── */
     .table-wrap { overflow-x:auto; border-radius:10px; border:1px solid var(--border); margin-bottom:18px; }
@@ -181,8 +193,9 @@
     .context-snippet { font-size:12px; line-height:1.6; }
     mark.orig-mark { background:var(--mark-orig-bg); color:var(--mark-orig-fg); border-radius:3px; padding:1px 2px; font-weight:700; }
     mark.corr-mark { background:var(--mark-corr-bg); color:var(--mark-corr-fg); border-radius:3px; padding:1px 2px; font-weight:700; }
-    .copy-btn { background:none; border:none; cursor:pointer; color:var(--muted); font-size:13px; padding:2px 4px; border-radius:4px; transition:all .15s; }
+    .copy-btn { background:none; border:none; cursor:pointer; color:var(--muted); padding:3px 5px; border-radius:4px; transition:all .15s; display:inline-flex; align-items:center; }
     .copy-btn:hover { color:var(--accent); background:rgba(99,102,241,.1); }
+    .copy-btn svg { width:13px; height:13px; }
 
     /* ── Empty + cards ── */
     .empty { text-align:center; padding:60px 24px; color:var(--muted); }
@@ -232,30 +245,40 @@
     .toast { position:fixed; bottom:18px; right:18px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:11px 16px; font-size:13px; max-width:280px; box-shadow:0 8px 32px rgba(0,0,0,.4); transform:translateY(100px); opacity:0; transition:all .25s; z-index:999; }
     .toast.show { transform:translateY(0); opacity:1; }
 
-    /* ── Print (greyscale) ── */
+    /* ── Print ── */
     @media print {
-      body { background:white !important; color:black !important; }
-      header { background:white !important; border-bottom:2px solid black !important; }
-      header h1, header p { color:black !important; }
-      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .analyse-panel, .header-actions { display:none !important; }
-      #report-page { display:block !important; padding:0 !important; }
-      .page { max-width:100% !important; padding:0 !important; }
-      .stat-card { background:white !important; border:1px solid #bbb !important; }
-      .stat-num { color:black !important; }
-      .stat-lbl, .report-meta { color:#555 !important; }
-      .report-title { color:black !important; }
-      .score-circle { border-color:#555 !important; }
-      .score-num, .score-grade { color:black !important; }
-      .table-wrap { border:1px solid #bbb !important; }
-      th { background:#eee !important; color:#333 !important; border:1px solid #ccc !important; }
-      td { border:1px solid #ddd !important; color:black !important; }
-      tr:nth-child(even) td { background:#f7f7f7 !important; }
-      .badge { background:#eee !important; color:black !important; border:1px solid #999 !important; }
-      mark.orig-mark { background:#ddd !important; color:black !important; }
-      mark.corr-mark { background:#aaa !important; color:black !important; }
-      .sev-Critical, .sev-Moderate, .sev-Minor { color:#555 !important; }
-      .check-chip { background:#eee !important; color:#333 !important; border:1px solid #ccc !important; }
       * { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+      body { background:white !important; color:#111 !important; font-size:11pt; }
+      header { background:white !important; border-bottom:2px solid #222 !important; padding:8px 16px !important; }
+      header h1 { color:#111 !important; font-size:14pt !important; }
+      header p { color:#555 !important; }
+      .logo svg path { fill:#111 !important; }
+      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .sev-filter-bar, .analyse-panel, .header-actions, .export-dropdown { display:none !important; }
+      #report-page { display:block !important; }
+      .page { max-width:100% !important; padding:8px 12px !important; }
+      #report-cost { display:block !important; color:#555 !important; }
+      .report-title { color:#111 !important; font-size:16pt !important; }
+      .report-meta { color:#555 !important; }
+      .stats-grid { grid-template-columns:repeat(auto-fill,minmax(80px,1fr)) !important; }
+      .stat-card { background:white !important; border:1px solid #ccc !important; box-shadow:none !important; }
+      .stat-num { font-size:18pt !important; }
+      .stat-lbl { color:#555 !important; }
+      .score-circle { border-color:#555 !important; }
+      .score-num, .score-grade { color:#111 !important; }
+      .table-wrap { border:1px solid #bbb !important; box-shadow:none !important; }
+      table { font-size:8pt !important; }
+      th { background:#f0f0f0 !important; color:#333 !important; border:1px solid #ccc !important; padding:5px 7px !important; }
+      td { border:1px solid #ddd !important; color:#111 !important; padding:5px 7px !important; }
+      tr:nth-child(even) td { background:#fafafa !important; }
+      .badge { border:1px solid #999 !important; }
+      mark.orig-mark { background:#fdd !important; color:#c00 !important; }
+      mark.corr-mark { background:#dfd !important; color:#060 !important; }
+      .sev-Critical { color:#c00 !important; }
+      .sev-Moderate { color:#b45 !important; }
+      .sev-Minor { color:#777 !important; }
+      .check-chip { background:#eee !important; color:#333 !important; border:1px solid #ccc !important; }
+      .copy-btn { display:none !important; }
+      @page { margin:15mm 12mm; }
     }
 
     @media (max-width:600px) {
@@ -392,17 +415,44 @@
         <div class="score-label" id="score-label"></div>
       </div>
       <div class="report-actions">
-        <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨 Print</button>
-        <button class="btn btn-secondary btn-sm" onclick="downloadCorrected()">✅ Corrected Doc</button>
-        <button class="btn btn-secondary btn-sm" onclick="exportHTML()">🔗 Share HTML</button>
-        <button class="btn btn-secondary btn-sm" onclick="downloadWord()">📝 Word</button>
-        <button class="btn btn-primary btn-sm" onclick="downloadPDF()">📄 PDF</button>
+        <div class="export-dropdown" id="export-dropdown">
+          <button class="btn btn-primary btn-sm" onclick="toggleExportMenu(event)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="export-menu" id="export-menu">
+            <button onclick="window.print();closeExportMenu()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Print
+            </button>
+            <div class="menu-divider"></div>
+            <button onclick="downloadPDF();closeExportMenu()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              Download PDF
+            </button>
+            <button onclick="downloadWord();closeExportMenu()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              Download Word (.docx)
+            </button>
+            <button onclick="exportHTML();closeExportMenu()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              Share as HTML
+            </button>
+            <div class="menu-divider"></div>
+            <button onclick="downloadCorrected();closeExportMenu()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Download Corrected Doc
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="checked-summary" id="checked-summary"></div>
     <div class="stats-grid" id="stats-grid"></div>
     <div class="filter-bar" id="filter-bar"></div>
+    <div class="sev-filter-bar" id="sev-filter-bar"></div>
 
     <div class="table-wrap">
       <table>
@@ -525,6 +575,7 @@ let fileQueue        = [];
 let lastReport       = null;
 let lastExtractedText= '';
 let activeFilters    = new Set();
+let activeSevFilter  = new Set();
 let selectedChecks   = new Set(); // empty = All
 let progressAnim     = null;
 let docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
@@ -1184,6 +1235,7 @@ function renderReport(r) {
 
   // Filters
   activeFilters.clear();
+  activeSevFilter.clear();
   buildFilters(r);
   renderTable(r.errors||[]);
 }
@@ -1195,19 +1247,39 @@ function addStatCard(grid,num,lbl,color) {
 }
 
 function buildFilters(r) {
+  const errors = r.errors||[];
+
+  // Type filter
   const bar=document.getElementById('filter-bar');
   bar.innerHTML='';
-  const present=ALL_TYPES.filter(t=>(r.errors||[]).some(e=>e.type===t));
-  if (present.length<2) { bar.style.display='none'; return; }
-  bar.style.display='flex';
-  const allBtn=mkFBtn('All','all','var(--accent)',true);
-  allBtn.onclick=()=>{ activeFilters.clear(); syncFilters(r); };
-  bar.appendChild(allBtn);
-  present.forEach(t=>{ const b=mkFBtn(t,t,TYPE_COLORS[t],false); b.onclick=()=>{ if(activeFilters.has(t))activeFilters.delete(t);else activeFilters.add(t); syncFilters(r); }; bar.appendChild(b); });
+  const present=ALL_TYPES.filter(t=>errors.some(e=>e.type===t));
+  if (present.length<2) { bar.style.display='none'; }
+  else {
+    bar.style.display='flex';
+    const allBtn=mkFBtn('All','all','var(--accent)',true,'filter-btn');
+    allBtn.onclick=()=>{ activeFilters.clear(); syncFilters(r); };
+    bar.appendChild(allBtn);
+    present.forEach(t=>{ const b=mkFBtn(t,t,TYPE_COLORS[t],false,'filter-btn'); b.onclick=()=>{ if(activeFilters.has(t))activeFilters.delete(t);else activeFilters.add(t); syncFilters(r); }; bar.appendChild(b); });
+  }
+
+  // Severity filter
+  const sevBar=document.getElementById('sev-filter-bar');
+  sevBar.innerHTML='';
+  const SEV_COLORS={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8'};
+  const presentSevs=['Critical','Moderate','Minor'].filter(s=>errors.some(e=>e.severity===s));
+  if (presentSevs.length<2) { sevBar.style.display='none'; }
+  else {
+    sevBar.style.display='flex';
+    const lbl=document.createElement('span'); lbl.className='sev-filter-label'; lbl.textContent='Severity:'; sevBar.appendChild(lbl);
+    const allSev=mkFBtn('All','all','#64748b',true,'sev-btn');
+    allSev.onclick=()=>{ activeSevFilter.clear(); syncFilters(r); };
+    sevBar.appendChild(allSev);
+    presentSevs.forEach(s=>{ const b=mkFBtn(s,s,SEV_COLORS[s],false,'sev-btn'); b.onclick=()=>{ if(activeSevFilter.has(s))activeSevFilter.delete(s);else activeSevFilter.add(s); syncFilters(r); }; sevBar.appendChild(b); });
+  }
 }
 
-function mkFBtn(lbl,type,color,on) {
-  const b=document.createElement('button'); b.className='filter-btn'+(on?' on':''); b.dataset.type=type; b.textContent=lbl; if(on)b.style.background=color; return b;
+function mkFBtn(lbl,type,color,on,cls) {
+  const b=document.createElement('button'); b.className=cls+(on?' on':''); b.dataset.type=type; b.textContent=lbl; if(on)b.style.background=color; return b;
 }
 
 function syncFilters(r) {
@@ -1215,7 +1287,16 @@ function syncFilters(r) {
     const on=b.dataset.type==='all'?activeFilters.size===0:activeFilters.has(b.dataset.type);
     b.classList.toggle('on',on); b.style.background=on?(b.dataset.type==='all'?'var(--accent)':TYPE_COLORS[b.dataset.type]):'';
   });
-  renderTable(activeFilters.size===0?r.errors:r.errors.filter(e=>activeFilters.has(e.type)));
+  const SEV_COLORS={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8'};
+  document.querySelectorAll('.sev-btn').forEach(b=>{
+    const on=b.dataset.type==='all'?activeSevFilter.size===0:activeSevFilter.has(b.dataset.type);
+    b.classList.toggle('on',on); b.style.background=on?(b.dataset.type==='all'?'#64748b':SEV_COLORS[b.dataset.type]):'';
+  });
+  const filtered=(r.errors||[]).filter(e=>
+    (activeFilters.size===0||activeFilters.has(e.type))&&
+    (activeSevFilter.size===0||activeSevFilter.has(e.severity))
+  );
+  renderTable(filtered);
 }
 
 function renderTable(errors) {
@@ -1235,7 +1316,7 @@ function renderTable(errors) {
       <td class="pg-num"${hasPages?'':' style="display:none"'}>${hasPages?(e.page?`p.${e.page}`:'—'):''}</td>
       <td class="context-snippet">${buildCtx(e.context,e.original,'orig-mark')}</td>
       <td class="context-snippet">${buildCtx(e.context,e.original,'corr-mark',e.corrected)}</td>
-      <td><button class="copy-btn" onclick="copyText('${esc(e.corrected).replace(/'/g,"&#39;")}',this)" title="Copy corrected text">📋</button></td>
+      <td><button class="copy-btn" onclick="copyText('${esc(e.corrected).replace(/'/g,"&#39;")}',this)" title="Copy corrected text"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></td>
       <td style="font-size:11px;color:var(--muted)">${esc(e.explanation)}</td>`;
     tbody.appendChild(tr);
   });
@@ -1338,51 +1419,85 @@ async function downloadPDF() {
   try {
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const ML=14, PW=210; let y=18;
-    const g=(v)=>doc.setTextColor(v,v,v);
-    const ln=(yy,gv=200)=>{ doc.setDrawColor(gv,gv,gv); doc.line(ML,yy,PW-14,yy); };
+    const ML=14, MR=14, PW=210, CW=PW-ML-MR; let y=14;
+    const rgb=(hex)=>{ const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return [r,g,b]; };
+    const gc=(r,g,b)=>doc.setTextColor(r,g,b);
+    const gg=(v)=>gc(v,v,v);
+    const ln=(yy,gv=210)=>{ doc.setDrawColor(gv,gv,gv); doc.line(ML,yy,PW-MR,yy); };
 
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); g(20);
-    doc.text('Proofreading Report',ML,y); y+=7;
-    if (docInfo.filename) { doc.setFont('helvetica','italic'); doc.setFontSize(9); g(100); doc.text(docInfo.filename,ML,y); y+=5; }
-    doc.setFont('helvetica','normal'); doc.setFontSize(9); g(120);
+    // Header bar
+    doc.setFillColor(14,14,9); doc.rect(0,0,PW,16,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(255,255,255);
+    doc.text('Explorer AI Proofreader',ML,10);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,180,180);
+    doc.text('Professional proofreading · Powered by Claude',ML,14.5);
+    y=22;
+
+    // Title
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); gg(20);
+    doc.text('Proofreading Report',ML,y); y+=6;
+    if (docInfo.filename) { doc.setFont('helvetica','italic'); doc.setFontSize(8); gg(120); doc.text(docInfo.filename,ML,y); y+=5; }
+
+    // Meta
     const score=calculateScore(lastReport);
     const [,grade,,label]=getGrade(score);
     const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-    const metaParts=[date,lastReport.language||docInfo.language||'',`~${(lastReport.word_count||docInfo.wordCount||0).toLocaleString()} words`,`${lastReport.summary.total_errors} issues`,`Score: ${score} (${grade} — ${label})`].filter(Boolean);
-    doc.text(metaParts.join('  ·  '),ML,y); y+=7;
-    ln(y); y+=6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); gg(100);
+    const metaParts=[date,lastReport.language||docInfo.language||'',`${(lastReport.word_count||docInfo.wordCount||0).toLocaleString()} words`,`${lastReport.summary.total_errors} issues found`,`Score: ${score}/100 (${grade} — ${label})`].filter(Boolean);
+    doc.text(metaParts.join('   ·   '),ML,y); y+=3;
+    if (lastReport._cost) { doc.setFontSize(7); gg(150); doc.text(`AI cost: $${lastReport._cost.toFixed(4)}`,ML,y+2); y+=3; }
+    y+=4; ln(y); y+=5;
 
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); g(30);
-    doc.text('Summary',ML,y); y+=6;
-    doc.setFontSize(9); let sx=ML;
-    ALL_TYPES.forEach(t=>{ const cnt=lastReport.summary[t]||0; if(!cnt)return; doc.setFont('helvetica','bold');g(60);doc.text(`${t}: `,sx,y);const w=doc.getTextWidth(`${t}: `);doc.setFont('helvetica','normal');g(40);doc.text(String(cnt),sx+w,y);sx+=w+doc.getTextWidth(String(cnt))+8;if(sx>PW-30){sx=ML;y+=5;} });
+    // Summary
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); gg(30);
+    doc.text('Summary by type',ML,y); y+=5;
+    doc.setFontSize(8); let sx=ML;
+    ALL_TYPES.forEach(t=>{
+      const cnt=lastReport.summary[t]||0; if(!cnt)return;
+      const [r2,g2,b2]=rgb(TYPE_COLORS[t]);
+      doc.setFont('helvetica','bold'); gc(r2,g2,b2); const tw=doc.getTextWidth(`${t}: `);
+      doc.text(`${t}: `,sx,y);
+      doc.setFont('helvetica','normal'); gg(40); doc.text(String(cnt),sx+tw,y);
+      sx+=tw+doc.getTextWidth(String(cnt))+10;
+      if(sx>PW-MR-30){sx=ML;y+=5;}
+    });
     y+=8; ln(y); y+=5;
 
+    // Table
     const hasPages=lastReport.errors.some(e=>e.page);
-    const COLS=hasPages?[10,22,12,44,44,46]:[10,22,48,48,48];
-    const HEADS=hasPages?['#','Type','Pg','Original','Corrected','Explanation']:['#','Type','Original','Corrected','Explanation'];
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); g(130);
+    // Cols: #, Type, Sev, [Pg], Original, Corrected, Explanation
+    const COLS=hasPages?[8,20,16,10,38,38,42]:[8,20,16,44,44,50];
+    const HEADS=hasPages?['#','Type','Sev','Pg','Original','Corrected','Explanation']:['#','Type','Sev','Original','Corrected','Explanation'];
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); gg(100);
     let cx=ML; HEADS.forEach((h,i)=>{ doc.text(h,cx,y); cx+=COLS[i]; });
-    y+=2; ln(y,180); y+=4;
-    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    y+=2; ln(y,180); y+=3;
+    doc.setFontSize(8);
+    const SEV_HEX={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8'};
     (lastReport.errors||[]).forEach(e=>{
-      if(y>270){doc.addPage();y=18;}
-      const oW=doc.splitTextToSize(`…${e.original||''}…`,COLS[hasPages?3:2]-3);
-      const cW=doc.splitTextToSize(`…${e.corrected||''}…`,COLS[hasPages?4:3]-3);
-      const xW=doc.splitTextToSize(e.explanation||'',COLS[hasPages?5:4]-3);
-      const rH=Math.max(oW.length,cW.length,xW.length)*3.8+5;
+      if(y>272){doc.addPage();y=14;}
+      const sCol=hasPages?4:3, cCol=hasPages?5:4, xCol=hasPages?6:5;
+      const oW=doc.splitTextToSize(`${e.original||''}`,COLS[sCol]-3);
+      const cW=doc.splitTextToSize(`${e.corrected||''}`,COLS[cCol]-3);
+      const xW=doc.splitTextToSize(e.explanation||'',COLS[xCol]-3);
+      const rH=Math.max(oW.length,cW.length,xW.length)*3.8+4;
       cx=ML;
-      g(150);doc.text(String(e.id),cx,y+3);cx+=COLS[0];
-      g(50);doc.setFont('helvetica','bold');doc.text(e.type,cx,y+3);cx+=COLS[1];doc.setFont('helvetica','normal');
-      if(hasPages){g(160);doc.text(e.page?`p.${e.page}`:'—',cx,y+3);cx+=COLS[2];}
-      g(70);doc.text(oW,cx,y+3);cx+=COLS[hasPages?3:2];
-      g(30);doc.setFont('helvetica','bold');doc.text(cW,cx,y+3);cx+=COLS[hasPages?4:3];doc.setFont('helvetica','normal');
-      g(120);doc.text(xW,cx,y+3);
-      y+=rH; ln(y,220); y+=2;
+      gg(160); doc.setFont('helvetica','normal'); doc.text(String(e.id),cx,y+3); cx+=COLS[0];
+      const [tr,tg,tb]=rgb(TYPE_COLORS[e.type]||'#94a3b8'); gc(tr,tg,tb); doc.setFont('helvetica','bold'); doc.text(e.type||'',cx,y+3); cx+=COLS[1]; doc.setFont('helvetica','normal');
+      if(e.severity&&SEV_HEX[e.severity]){const [sr,sg,sb]=rgb(SEV_HEX[e.severity]);gc(sr,sg,sb);}else{gg(140);}
+      doc.setFontSize(7); doc.text(e.severity||'',cx,y+3); doc.setFontSize(8); cx+=COLS[2];
+      if(hasPages){gg(160);doc.text(e.page?`p.${e.page}`:'—',cx,y+3);cx+=COLS[3];}
+      gg(80); doc.text(oW,cx,y+3); cx+=COLS[sCol];
+      gg(20); doc.setFont('helvetica','bold'); doc.text(cW,cx,y+3); cx+=COLS[cCol]; doc.setFont('helvetica','normal');
+      gg(110); doc.text(xW,cx,y+3);
+      y+=rH; ln(y,225); y+=1;
     });
-    y+=4; doc.setFontSize(7); g(180);
-    doc.text('AI Proofreader · Powered by Anthropic Claude',ML,y);
+
+    // Footer
+    const pageCount=doc.getNumberOfPages();
+    for(let i=1;i<=pageCount;i++){
+      doc.setPage(i); doc.setFontSize(7); gg(180);
+      doc.text(`Explorer AI Proofreader · Powered by Anthropic Claude · Page ${i} of ${pageCount}`,ML,292);
+    }
     doc.save(`proofreading-report-${Date.now()}.pdf`);
     toast('PDF downloaded!');
   } catch(err) { toast('PDF error: '+err.message,'err'); console.error(err); }
@@ -1396,26 +1511,43 @@ async function downloadWord() {
   if (typeof docx==='undefined') { toast('Word library not loaded — reload the page.','err'); return; }
   toast('Generating Word document…');
   try {
-    const {Document,Paragraph,Table,TableRow,TableCell,TextRun,HeadingLevel,WidthType,Packer}=docx;
+    const {Document,Paragraph,Table,TableRow,TableCell,TextRun,HeadingLevel,WidthType,AlignmentType,BorderStyle,Packer}=docx;
     const r=lastReport, hasPages=r.errors.some(e=>e.page);
     const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const score=calculateScore(r); const [,grade,,label]=getGrade(score);
-    const cell=(txt,bold)=>new TableCell({children:[new Paragraph({children:[new TextRun({text:String(txt||''),bold:!!bold,size:18})]})]});
-    const hRow=new TableRow({children:(hasPages?['#','Type','Sev','Page','Original','Corrected','Explanation']:['#','Type','Sev','Original','Corrected','Explanation']).map(h=>cell(h,true))});
-    const dRows=r.errors.map(e=>new TableRow({children:[cell(e.id),cell(e.type,true),cell(e.severity||''),...( hasPages?[cell(e.page?`p.${e.page}`:'—')]:[]),cell(`…${e.original||''}…`),cell(e.corrected||'',true),cell(e.explanation||'')]}));
-    const sumPs=ALL_TYPES.filter(t=>(r.summary[t]||0)>0).map(t=>new Paragraph({children:[new TextRun({text:`${t}: `,bold:true}),new TextRun({text:String(r.summary[t])})],spacing:{after:60}}));
+    const hexToDocx=(hex)=>hex.replace('#','');
+    const SEV_HEX={'Critical':'ef4444','Moderate':'f97316','Minor':'94a3b8'};
+    const noBorder={top:{style:BorderStyle.NONE,size:0},bottom:{style:BorderStyle.NONE,size:0},left:{style:BorderStyle.NONE,size:0},right:{style:BorderStyle.NONE,size:0}};
+    const cell=(txt,opts={})=>new TableCell({borders:noBorder,shading:{fill:'FFFFFF'},children:[new Paragraph({children:[new TextRun({text:String(txt||''),bold:!!opts.bold,color:opts.color||'111111',size:opts.size||18,italics:!!opts.italic})]})]});
+    const hCell=(txt)=>new TableCell({shading:{fill:'F0F0F0'},borders:{top:{style:BorderStyle.SINGLE,size:4,color:'CCCCCC'},bottom:{style:BorderStyle.SINGLE,size:4,color:'CCCCCC'},left:{style:BorderStyle.NONE,size:0},right:{style:BorderStyle.NONE,size:0}},children:[new Paragraph({children:[new TextRun({text:txt,bold:true,size:16,color:'444444'})]})]});
+    const cols=hasPages?['#','Type','Severity','Pg','Original','Corrected','Explanation']:['#','Type','Severity','Original','Corrected','Explanation'];
+    const hRow=new TableRow({children:cols.map(h=>hCell(h))});
+    const dRows=r.errors.map(e=>new TableRow({children:[
+      cell(e.id,{color:'888888'}),
+      cell(e.type,{bold:true,color:hexToDocx(TYPE_COLORS[e.type]||'#94a3b8')}),
+      cell(e.severity||'',{bold:true,color:SEV_HEX[e.severity]||'94a3b8'}),
+      ...(hasPages?[cell(e.page?`p.${e.page}`:'—',{color:'888888'})]:[]),
+      cell(e.original||'',{italic:true,color:'880000'}),
+      cell(e.corrected||'',{bold:true,color:'006633'}),
+      cell(e.explanation||'',{color:'444444'}),
+    ]}));
+    const sumPs=ALL_TYPES.filter(t=>(r.summary[t]||0)>0).map(t=>new Paragraph({children:[new TextRun({text:`${t}: `,bold:true,color:hexToDocx(TYPE_COLORS[t])}),new TextRun({text:String(r.summary[t]),color:'222222'})],spacing:{after:60}}));
+    const costLine=r._cost?[new Paragraph({children:[new TextRun({text:`AI cost: $${r._cost.toFixed(4)}`,color:'94a3b8',size:16})],spacing:{after:120}})] :[];
     const wordDoc=new Document({sections:[{children:[
+      new Paragraph({children:[new TextRun({text:'Explorer AI Proofreader',bold:true,size:28,color:'0e0e09'})],spacing:{after:40}}),
+      new Paragraph({children:[new TextRun({text:'Professional proofreading · Powered by Claude',size:16,color:'888888'})],spacing:{after:240}}),
       new Paragraph({text:'Proofreading Report',heading:HeadingLevel.HEADING_1,spacing:{after:120}}),
-      new Paragraph({children:[new TextRun({text:`Score: ${score}/100 (${grade} — ${label})  |  ${date}  |  ${r.language||docInfo.language||''}  |  ~${(r.word_count||0).toLocaleString()} words  |  Issues: ${r.summary.total_errors}${docInfo.filename?'  |  '+docInfo.filename:''}`,color:'6b7280',size:18})],spacing:{after:240}}),
-      new Paragraph({text:'Summary',heading:HeadingLevel.HEADING_2}),
-      new Paragraph({children:[new TextRun({text:`Total: ${r.summary.total_errors}`,bold:true})],spacing:{after:80}}),
+      new Paragraph({children:[new TextRun({text:[date,r.language||docInfo.language||'',`${(r.word_count||docInfo.wordCount||0).toLocaleString()} words`,`${r.summary.total_errors} issues`,`Score: ${score}/100 (${grade} — ${label})`].filter(Boolean).join('   ·   '),color:'6b7280',size:18})],spacing:{after:80}}),
+      ...(docInfo.filename?[new Paragraph({children:[new TextRun({text:docInfo.filename,color:'888888',size:16})],spacing:{after:80}})]:[]),
+      ...costLine,
+      new Paragraph({text:'Summary',heading:HeadingLevel.HEADING_2,spacing:{after:80}}),
+      new Paragraph({children:[new TextRun({text:`Total issues: ${r.summary.total_errors}`,bold:true})],spacing:{after:80}}),
       ...sumPs,
       new Paragraph({text:'',spacing:{after:200}}),
-      new Paragraph({text:'Error Details',heading:HeadingLevel.HEADING_2}),
-      new Paragraph({text:'',spacing:{after:100}}),
+      new Paragraph({text:'Error Details',heading:HeadingLevel.HEADING_2,spacing:{after:120}}),
       new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[hRow,...dRows]}),
-      new Paragraph({text:'',spacing:{after:300}}),
-      new Paragraph({children:[new TextRun({text:'Generated by AI Proofreader · Powered by Anthropic Claude',color:'94a3b8',size:16})]}),
+      new Paragraph({text:'',spacing:{after:400}}),
+      new Paragraph({children:[new TextRun({text:'Generated by Explorer AI Proofreader · Powered by Anthropic Claude',color:'94a3b8',size:16})]}),
     ]}]});
     const blob=await Packer.toBlob(wordDoc);
     dlBlob(blob,`proofreading-report-${Date.now()}.docx`);
@@ -1467,23 +1599,43 @@ function exportHTML() {
   if (!lastReport) return;
   const theme=document.documentElement.dataset.theme||'dark';
   const styles=document.querySelector('style').textContent;
-  const content=document.getElementById('report-content').outerHTML;
+
+  // Clone report content and fix it for static export
+  const clone=document.getElementById('report-content').cloneNode(true);
+  clone.style.display='block';
+  // Show cost
+  const costEl=clone.querySelector('#report-cost'); if(costEl) costEl.style.display='block';
+  // Remove interactive elements that don't work without JS
+  ['filter-bar','sev-filter-bar','.export-dropdown','.report-actions'].forEach(sel=>{
+    clone.querySelectorAll(sel.startsWith('.')?sel:'#'+sel).forEach(el=>el.remove());
+  });
+  // Remove copy buttons
+  clone.querySelectorAll('.copy-btn').forEach(el=>el.remove());
+  // Add static "col-copy" header display fix
+  const colCopy=clone.querySelector('.col-copy'); if(colCopy) colCopy.remove();
+
+  const explorerSVG=document.querySelector('.logo svg').outerHTML;
   const html=`<!DOCTYPE html>
 <html lang="en" data-theme="${theme}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Proofreading Report — ${esc(docInfo.filename||'document')}</title>
-  <style>${styles}</style>
+  <style>${styles}
+    body { max-width:none; }
+    .copy-btn { display:none; }
+  </style>
 </head>
 <body>
   <header style="background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px">
-    <span style="font-size:24px">✍️</span>
-    <div><div style="font-size:17px;font-weight:700;color:var(--text)">AI Proofreader</div>
-    <div style="font-size:11px;color:var(--muted)">Proofreading Report</div></div>
+    <div class="logo" style="display:flex;align-items:center">${explorerSVG}</div>
+    <div>
+      <div style="font-size:17px;font-weight:700;color:var(--text)">Explorer AI Proofreader</div>
+      <div style="font-size:11px;color:var(--muted)">Proofreading Report · Powered by Claude</div>
+    </div>
   </header>
   <div style="max-width:1280px;margin:0 auto;padding:22px 24px">
-    ${content}
+    ${clone.outerHTML}
   </div>
 </body>
 </html>`;
@@ -1507,6 +1659,15 @@ function dlBlob(blob,filename) {
   const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  document.getElementById('export-menu').classList.toggle('open');
+}
+function closeExportMenu() {
+  document.getElementById('export-menu').classList.remove('open');
+}
+document.addEventListener('click', ()=>closeExportMenu());
+
 function showApiError(title, body) {
   document.getElementById('api-error-title').textContent = title;
   document.getElementById('api-error-body').innerHTML = body;
