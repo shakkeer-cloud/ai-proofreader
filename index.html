@@ -1222,11 +1222,20 @@ function renderReport(r) {
     cs.innerHTML += `<span class="check-chip" style="background:rgba(99,102,241,.1);color:var(--accent);border:1px solid rgba(99,102,241,.2);margin-left:4px">Checked: ${r._checks.join(', ')}</span>`;
   }
 
-  // Stats
+  // Stats — by type
   const grid=document.getElementById('stats-grid');
   grid.innerHTML='';
   addStatCard(grid, r.summary.total_errors,'Total Issues','var(--accent)');
   ALL_TYPES.forEach(t=>{ if ((r.summary[t]||0)>0) addStatCard(grid,r.summary[t],t,TYPE_COLORS[t]); });
+  // Stats — by severity
+  const sevCounts={Critical:0,Moderate:0,Minor:0};
+  (r.errors||[]).forEach(e=>{if(e.severity&&sevCounts[e.severity]!==undefined)sevCounts[e.severity]++;});
+  const SEV_COLORS_STAT={Critical:'#ef4444',Moderate:'#f97316',Minor:'#94a3b8'};
+  const sdiv=document.createElement('div');
+  sdiv.style.cssText='grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:4px';
+  sdiv.innerHTML='<span style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">By Severity</span><div style="flex:1;height:1px;background:var(--border)"></div>';
+  grid.appendChild(sdiv);
+  Object.entries(sevCounts).forEach(([sev,cnt])=>addStatCard(grid,cnt,sev,SEV_COLORS_STAT[sev]));
 
   // Page col
   const hasPages=r.errors&&r.errors.some(e=>e.page);
