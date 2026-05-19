@@ -479,6 +479,16 @@
   </div>
 </div>
 
+<!-- ══════════ API ERROR MODAL ══════════ -->
+<div class="modal-overlay" id="api-error-modal">
+  <div class="modal-box" style="max-width:420px;text-align:center;">
+    <div style="font-size:2rem;margin-bottom:8px;">⚠️</div>
+    <div class="modal-title" id="api-error-title" style="margin-bottom:12px;color:#ef4444;"></div>
+    <p id="api-error-body" style="color:#555;font-size:0.95rem;line-height:1.6;margin-bottom:24px;"></p>
+    <button class="btn btn-primary" onclick="document.getElementById('api-error-modal').classList.remove('open')">OK, got it</button>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════
 // Constants
@@ -888,11 +898,10 @@ function hideConfirmModal() {
 }
 
 async function confirmAndProofread() {
+  const args = _pendingProofreadArgs;
   hideConfirmModal();
-  if (!_pendingProofreadArgs) return;
-  const { file, pasteText, apiKey } = _pendingProofreadArgs;
-  _pendingProofreadArgs = null;
-  await proofreadOne(file, pasteText, apiKey, true);
+  if (!args) return;
+  await proofreadOne(args.file, args.pasteText, args.apiKey, true);
 }
 
 // ══════════════════════════════════════════════
@@ -1095,7 +1104,16 @@ Return ONLY valid JSON (no markdown, no extra text):
     completeProgress();
     if (showOnDone) { renderReport(report); showTab('report'); toast(`Found ${report.summary.total_errors} issue${report.summary.total_errors!==1?'s':''}.`); }
   } catch(err) {
-    if (showOnDone) toast('Error: '+err.message,'err');
+    if (showOnDone) {
+      const msg = err.message||'';
+      if (msg.toLowerCase().includes('credit') || msg.toLowerCase().includes('billing') || msg.includes('402')) {
+        showApiError('No API credits', 'Your Anthropic API key has run out of credits.<br><br>Go to <strong>console.anthropic.com → Billing</strong> to add credits, then try again.');
+      } else if (msg.toLowerCase().includes('invalid') && msg.toLowerCase().includes('api')) {
+        showApiError('Invalid API key', 'The API key in Setup is invalid or expired.<br><br>Go to <strong>console.anthropic.com → API Keys</strong> to generate a new key.');
+      } else {
+        toast('Error: '+msg,'err');
+      }
+    }
     console.error(err);
     throw err;
   } finally {
@@ -1214,7 +1232,7 @@ function renderTable(errors) {
       <td><span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${esc(e.type)}</span>
           ${e.severity?`<span class="sev-badge ${sevCls}">${e.severity}</span>`:''}
       </td>
-      <td class="pg-num">${hasPages?(e.page?`p.${e.page}`:'—'):''}</td>
+      <td class="pg-num"${hasPages?'':' style="display:none"'}>${hasPages?(e.page?`p.${e.page}`:'—'):''}</td>
       <td class="context-snippet">${buildCtx(e.context,e.original,'orig-mark')}</td>
       <td class="context-snippet">${buildCtx(e.context,e.original,'corr-mark',e.corrected)}</td>
       <td><button class="copy-btn" onclick="copyText('${esc(e.corrected).replace(/'/g,"&#39;")}',this)" title="Copy corrected text">📋</button></td>
@@ -1488,6 +1506,11 @@ function dlBlob(blob,filename) {
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function showApiError(title, body) {
+  document.getElementById('api-error-title').textContent = title;
+  document.getElementById('api-error-body').innerHTML = body;
+  document.getElementById('api-error-modal').classList.add('open');
 }
 function toast(msg,type) {
   const el=document.getElementById('toast'); el.textContent=msg;
