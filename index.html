@@ -1012,20 +1012,20 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
   const systemPrompt = `You are a professional proofreader. ${langLine}
 ${checksLine}
 
-Error type definitions:
-- Typos: duplicate words (e.g. "the the"), repeated phrases, obvious keystroke errors. Always Critical severity.
-- Spelling: misspelled words.
-- Grammar: subject-verb agreement, wrong tense, fragments, run-ons.
-- Punctuation: missing/wrong commas, apostrophes, colons, full stops.
-- Capitalization: wrong capitalisation of proper nouns or sentence starts.
-- Style: wordy phrases, passive voice where active is clearer.
-- Consistency: same term spelled/formatted differently across the document.
-- Clarity: vague or ambiguous wording.
+Error type definitions — use EXACTLY these categories, no others:
+- Typos: ONLY exact word-level duplicates where the same word appears twice in a row (e.g. "the the", "and and"). Do NOT use Typos for sentence-level repetition or content that appears in multiple sentences — that is Consistency.
+- Spelling: misspelled words AND wrong word forms (e.g. "informations" instead of "information", "childs" instead of "children"). Homophones used incorrectly (there/their/they're) are also Spelling.
+- Grammar: subject-verb disagreement, wrong verb tense, missing or wrong auxiliary verbs (e.g. "must addressed" → "must address"), run-on sentences, sentence fragments.
+- Punctuation: missing or wrong commas, incorrect apostrophes (including missing apostrophes in contractions), missing colons or semicolons.
+- Capitalization: missing capitalisation of proper nouns (names, cities, countries, days, months, titles) or sentence-starting words.
+- Style: wordy phrases that should be simplified (e.g. "due to the fact that" → "because"), passive voice where active is clearer.
+- Consistency: the same term, name, or abbreviation written differently in different places (e.g. "CRM" vs "crm", "e-mail" vs "email"). Also use for content repeated across sentences that adds no new information.
+- Clarity: vague or ambiguous wording where the meaning is unclear.
 
 Severity rules:
-- Critical: Typos (always), misspellings, broken grammar, wrong words that change meaning.
-- Moderate: Clear errors that distract but don't change meaning.
-- Minor: Style preferences, consistency, minor clarity issues.
+- Critical: Typos (always), misspellings, wrong word forms, wrong homophones, broken grammar that affects meaning.
+- Moderate: Clear errors that distract but do not change meaning (wrong punctuation, capitalisation, consistency).
+- Minor: Style preferences, clarity suggestions.
 
 IMPORTANT: Always write the "explanation" field in simple, plain English — even if the document is in another language. Keep explanations short and clear (one sentence).
 
