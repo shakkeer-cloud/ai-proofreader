@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Proofreader</title>
+  <title>Explorer AI Proofreader</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -33,7 +33,8 @@
 
     /* ── Header ── */
     header { background:var(--surface); border-bottom:1px solid var(--border); padding:12px 24px; display:flex; align-items:center; gap:12px; flex-shrink:0; }
-    .logo { font-size:24px; }
+    .logo { display:flex; align-items:center; }
+    .logo svg { height:36px; width:auto; }
     header h1 { font-size:17px; font-weight:700; }
     header p  { font-size:11px; color:var(--muted); margin-top:1px; }
     .header-actions { margin-left:auto; display:flex; align-items:center; gap:8px; }
@@ -47,7 +48,7 @@
     nav button:hover:not(.active) { color:var(--text); }
 
     /* ── Pages ── */
-    .page { display:none; flex:1; padding:22px 24px; max-width:980px; margin:0 auto; width:100%; }
+    .page { display:none; flex:1; padding:22px 24px; max-width:1280px; margin:0 auto; width:100%; }
     .page.active { display:block; }
 
     /* ── Upload zone ── */
@@ -160,7 +161,7 @@
     /* ── Error table ── */
     .table-wrap { overflow-x:auto; border-radius:10px; border:1px solid var(--border); margin-bottom:18px; }
     table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; }
-    colgroup col.col-id   { width:34px; }
+    colgroup col.col-id   { width:44px; }
     colgroup col.col-type { width:108px; }
     colgroup col.col-pg   { width:40px; }
     colgroup col.col-orig { width:auto; }
@@ -248,9 +249,9 @@
 <body>
 
 <header>
-  <div class="logo">✍️</div>
+  <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 116.48 67.16"><path d="M9.64,18.72L107.1,7.21c3.36-.38,2.86,2.78,2.86,2.78l-5.82,36.59c-.5,3.16-3.96,3.21-3.96,3.21H34.32l-5.78,10.05-5.56-10.05h-5.67c-3.1,0-4.17-3.16-4.17-3.16l-5.79-24.51c-.76-3.22,2.3-3.4,2.3-3.4" fill="#0e0e09"/><path d="M56.13,36.56h2.69v-15.07c0-.46-.52-.61-.77-.61-.45,0-.65.21-.78.48-.09.17-1.16,5.67-1.16,5.96l.02,9.24Z" fill="#fff"/><path d="M43.1,25.98v16.8c0,.47.52.63.77.63.45,0,.65-.21.78-.49.09-.18,1.16-5.79,1.16-6.08v-1.1c.88.79,2.26,1.09,3.34,1.09,3.81,0,5.15-2.84,5.15-5.62s-1.57-5.25-5.1-5.25c-1.15,0-2.47.33-3.4,1.06v-1.14s-2.7.1-2.7.1ZM45.86,31.6c0-1.56.93-2.94,2.69-2.94s2.41,1.44,2.41,2.99-.83,3.06-2.53,3.06-2.57-1.62-2.57-3.12" fill="#fff"/><path d="M78.69,28.26c.37,0,.75.06,1.76.3-.36-1.18-.67-1.78-1.05-2.52-.39-.04-.56-.06-.73-.06-1.4,0-2.56.61-3.19,1.69l-2.18-.7v9.6h2.78v-5.18c0-1.57.84-3.13,2.61-3.13" fill="#fff"/><path d="M90.98,30.8c0-2.58-1.98-4.82-5.1-4.82-3.64,0-5.4,2.67-5.4,5.5,0,3.11,2.09,5.08,5.66,5.08,1.1,0,3.17-.3,4.22-.76.28-.13.43-.34.43-.63,0-.49-.45-.91-1.01-.78-.9.23-1.79.38-2.69.38-1.94,0-3.53-.85-3.62-2.48,1.08-.09,6.44-.66,7.43-.99.19-.05.08-.34.08-.51M88.29,30.1h-4.76c.24-1.14,1.14-2.05,2.43-2.05s2.2.89,2.33,2.05" fill="#fff"/><path d="M97.44,28.26c.37,0,.75.06,1.76.3-.37-1.18-.67-1.78-1.05-2.52-.39-.04-.56-.06-.73-.06-1.4,0-2.56.61-3.19,1.69l-2.18-.7v9.6h2.78v-5.18c0-1.57.84-3.13,2.61-3.13" fill="#fff"/><path d="M20.53,32.3c1.08-.09,6.44-.66,7.43-.99.19-.05.09-.34.09-.51,0-2.58-1.98-4.82-5.1-4.82-3.64,0-5.4,2.67-5.4,5.5,0,3.11,2.09,5.08,5.66,5.08,1.1,0,3.16-.3,4.22-.76.28-.13.43-.34.43-.63,0-.49-.45-.91-1.01-.78-.9.23-1.79.38-2.69.38-1.94,0-3.53-.85-3.62-2.48M23.03,28.05c1.33,0,2.2.89,2.32,2.05h-4.76c.24-1.14,1.14-2.05,2.43-2.05" fill="#fff"/><polygon points="28.67 25.98 32.96 25.98 35.04 28.65 37.13 25.98 41.41 25.98 37.13 31.25 41.35 36.56 37.13 36.56 35.04 33.89 32.96 36.56 28.7 36.56 32.96 31.25 28.67 25.98" fill="#fbf412"/><path d="M63.7,31.4c0,1.5.91,3.12,2.57,3.12s2.53-1.53,2.53-3.06-.65-2.99-2.41-2.99-2.69,1.37-2.69,2.94M72.19,31.14c0,3.04-2.3,5.42-5.97,5.42s-5.92-2.29-5.92-5.24,2.41-5.34,6.03-5.34c3.42,0,5.86,2.25,5.86,5.16" fill="#fff"/></svg></div>
   <div>
-    <h1>AI Proofreader</h1>
+    <h1>Explorer AI Proofreader</h1>
     <p>Professional proofreading · Powered by Claude</p>
   </div>
   <div class="header-actions">
@@ -1259,7 +1260,7 @@ function exportHTML() {
     <div><div style="font-size:17px;font-weight:700;color:var(--text)">AI Proofreader</div>
     <div style="font-size:11px;color:var(--muted)">Proofreading Report</div></div>
   </header>
-  <div style="max-width:980px;margin:0 auto;padding:22px 24px">
+  <div style="max-width:1280px;margin:0 auto;padding:22px 24px">
     ${content}
   </div>
 </body>
