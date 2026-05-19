@@ -207,6 +207,27 @@
     .hist-meta { font-size:11px; color:var(--muted); margin-top:2px; }
     .hist-actions { display:flex; gap:6px; flex-shrink:0; }
 
+    /* ── Proof-page check selector ── */
+    .check-selector { margin-top:14px; }
+    .check-selector > label { display:block; margin-bottom:7px; font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+    .check-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .check-sel-btn { padding:5px 13px; border-radius:20px; font-size:11px; font-weight:700; border:1px solid var(--border); background:var(--sf2); color:var(--muted); cursor:pointer; transition:all .15s; }
+    .check-sel-btn.on { color:white; border-color:transparent; }
+    .check-sel-btn.all-btn.on { background:var(--accent); }
+
+    /* ── Confirm modal ── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:200; opacity:0; pointer-events:none; transition:opacity .2s; }
+    .modal-overlay.open { opacity:1; pointer-events:all; }
+    .modal-box { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:24px 26px; max-width:460px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+    .modal-title { font-size:16px; font-weight:700; margin-bottom:16px; }
+    .modal-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+    .modal-row:last-of-type { border-bottom:none; }
+    .modal-row .lbl { color:var(--muted); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+    .modal-row .val { font-weight:600; }
+    .modal-cost { font-size:18px; font-weight:800; color:var(--accent); }
+    .modal-actions { display:flex; gap:10px; margin-top:20px; justify-content:flex-end; }
+    .modal-warn { font-size:11px; color:var(--muted); margin-top:10px; line-height:1.6; }
+
     /* ── Toast ── */
     .toast { position:fixed; bottom:18px; right:18px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:11px 16px; font-size:13px; max-width:280px; box-shadow:0 8px 32px rgba(0,0,0,.4); transform:translateY(100px); opacity:0; transition:all .25s; z-index:999; }
     .toast.show { transform:translateY(0); opacity:1; }
@@ -298,7 +319,7 @@
   <textarea id="paste-area" rows="6"
     placeholder="Paste your text here…&#10;&#10;Articles, emails, reports — paste anything to proofread."
     oninput="updateCharCount()"></textarea>
-  <div class="char-counter" id="char-counter">0 words · 0 / 140,000 chars</div>
+  <div class="char-counter" id="char-counter">0 words · 0 / 300,000 chars</div>
 
   <div class="instructions-wrap">
     <label for="ai-instructions">Additional instructions for AI <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
@@ -306,13 +327,18 @@
       placeholder="e.g. Preserve British English · Ignore technical jargon · Focus on formal tone · This is a legal document"></textarea>
   </div>
 
+  <div class="check-selector">
+    <label>Checks to run</label>
+    <div class="check-chips" id="check-chips"></div>
+  </div>
+
   <div class="options-row">
     <div class="field">
       <label>Language</label>
       <select id="language">
+        <option value="auto" selected>Auto-detect</option>
         <option value="english">English</option>
         <option value="arabic">Arabic (عربي)</option>
-        <option value="auto">Auto-detect</option>
       </select>
     </div>
     <div class="field">
@@ -426,7 +452,7 @@
   <div class="card" style="border-color:rgba(99,102,241,.3)">
     <h3>ℹ️ About</h3>
     <p class="help" style="font-size:12px">
-      Checks for <strong>Spelling, Grammar, Punctuation, Capitalization, Style, Consistency,</strong> and <strong>Clarity</strong> errors with severity ratings.
+      Checks for <strong>Typos, Spelling, Grammar, Punctuation, Capitalization, Style, Consistency,</strong> and <strong>Clarity</strong> errors with severity ratings.
       Supports PDF, Word (.docx), plain text, paste, and batch upload.
       Exports: PDF, Word, corrected document, shareable HTML.
     </p>
@@ -434,6 +460,24 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ══════════ CONFIRM MODAL ══════════ -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-box">
+    <div class="modal-title">✦ Confirm Proofreading</div>
+    <div class="modal-row"><span class="lbl">Document</span><span class="val" id="cm-filename" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <div class="modal-row"><span class="lbl">Words</span><span class="val" id="cm-words"></span></div>
+    <div class="modal-row"><span class="lbl">Chunks</span><span class="val" id="cm-chunks"></span></div>
+    <div class="modal-row"><span class="lbl">Checks</span><span class="val" id="cm-checks"></span></div>
+    <div class="modal-row"><span class="lbl">Model</span><span class="val" id="cm-model"></span></div>
+    <div class="modal-row" style="border-bottom:none;margin-top:4px"><span class="lbl">Estimated cost</span><span class="modal-cost" id="cm-cost"></span></div>
+    <p class="modal-warn">Cost is an estimate based on document size. Actual cost shown after completion.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="hideConfirmModal()">Cancel</button>
+      <button class="btn btn-primary btn-lg" id="cm-confirm-btn" onclick="confirmAndProofread()">Confirm &amp; Proofread</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ══════════════════════════════════════════════
@@ -443,7 +487,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
 const TYPE_COLORS = {
-  Spelling:'#ef4444', Grammar:'#f97316', Punctuation:'#eab308',
+  Typos:'#ff6b35', Spelling:'#ef4444', Grammar:'#f97316', Punctuation:'#eab308',
   Capitalization:'#a855f7', Style:'#3b82f6', Consistency:'#06b6d4', Clarity:'#10b981',
 };
 const ALL_TYPES = Object.keys(TYPE_COLORS);
@@ -452,7 +496,8 @@ const GRADE_CONFIG = [
   [80,'B','#06b6d4','Good'],       [70,'C','#eab308','Fair'],
   [60,'D','#f97316','Needs Work'], [0,'F','#ef4444','Poor'],
 ];
-const CHAR_LIMIT = 140000;
+const CHAR_LIMIT = 300000;
+const CHUNK_SIZE  = 240000;
 const MODEL_PRICING = {
   'claude-sonnet-4-6':       { in: 3.00,  out: 15.00 },
   'claude-opus-4-7':         { in: 15.00, out: 75.00 },
@@ -466,10 +511,11 @@ function calcCost(model, inputTok, outputTok) {
 // ══════════════════════════════════════════════
 // State
 // ══════════════════════════════════════════════
-let fileQueue        = [];   // [{file, status: 'waiting'|'processing'|'done'|'error'}]
+let fileQueue        = [];
 let lastReport       = null;
 let lastExtractedText= '';
 let activeFilters    = new Set();
+let selectedChecks   = new Set(); // empty = All
 let progressAnim     = null;
 let docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
 
@@ -758,24 +804,118 @@ function runDemo() {
   docInfo.filename='annual-report-draft.pdf'; docInfo.pages=4; docInfo.wordCount=312; docInfo.language='English';
   const demo = {
     language:'English', word_count:312, pages:4,
-    summary:{ total_errors:10, Spelling:2, Grammar:2, Punctuation:2, Capitalization:1, Style:1, Consistency:1, Clarity:1 },
+    summary:{ total_errors:11, Typos:1, Spelling:2, Grammar:2, Punctuation:2, Capitalization:1, Style:1, Consistency:1, Clarity:1 },
     errors:[
-      {id:1,type:'Spelling',severity:'Critical',page:1,context:'The compny released its annual financial report last quarter.',original:'compny',corrected:'company',explanation:'"compny" is a misspelling of "company".'},
-      {id:2,type:'Spelling',severity:'Critical',page:2,context:'Customers will recieve the updated pricing guide by email.',original:'recieve',corrected:'receive',explanation:'"recieve" should be "receive" — i before e.'},
-      {id:3,type:'Grammar',severity:'Critical',page:1,context:'There is many reasons why the project was delayed.',original:'There is many',corrected:'There are many',explanation:'"reasons" is plural so the verb must be "are".'},
-      {id:4,type:'Grammar',severity:'Moderate',page:3,context:"He don't understand the new company policy on remote work.",original:"He don't",corrected:"He doesn't",explanation:'Third-person singular requires "doesn\'t" not "don\'t".'},
-      {id:5,type:'Punctuation',severity:'Moderate',page:2,context:'However the results were clear and the team was satisfied.',original:'However the',corrected:'However, the',explanation:'A comma is needed after the introductory adverb "However".'},
-      {id:6,type:'Punctuation',severity:'Moderate',page:4,context:"The system is broken its a known issue that affects all users.",original:"broken its a",corrected:"broken, it's a",explanation:'"its" is possessive; the contraction "it\'s" is needed here.'},
-      {id:7,type:'Capitalization',severity:'Minor',page:1,context:'Our division handles the internet of things product line.',original:'internet of things',corrected:'Internet of Things',explanation:'"Internet of Things" is a proper noun and should be capitalised.'},
-      {id:8,type:'Style',severity:'Minor',page:3,context:'We changed approach due to the fact that costs were rising.',original:'due to the fact that',corrected:'because',explanation:'"Due to the fact that" is wordy; "because" is cleaner.'},
-      {id:9,type:'Consistency',severity:'Minor',page:2,context:'Please e-mail the team. Email responses expected within 24 hrs.',original:'e-mail … email',corrected:'email (consistently)',explanation:'The document mixes "e-mail" and "email"; pick one form.'},
-      {id:10,type:'Clarity',severity:'Minor',page:4,context:'Once activated, the system does the thing automatically for all users.',original:'does the thing',corrected:'processes requests',explanation:'"Does the thing" is vague — specify the action performed.'},
+      {id:1,type:'Typos',severity:'Critical',page:2,context:'The team reviewed the the proposal before the meeting.',original:'the the',corrected:'the',explanation:'The word "the" is duplicated — remove one.'},
+      {id:2,type:'Spelling',severity:'Critical',page:1,context:'The compny released its annual financial report last quarter.',original:'compny',corrected:'company',explanation:'"compny" is a misspelling of "company".'},
+      {id:3,type:'Spelling',severity:'Critical',page:2,context:'Customers will recieve the updated pricing guide by email.',original:'recieve',corrected:'receive',explanation:'"recieve" should be "receive" — i before e.'},
+      {id:4,type:'Grammar',severity:'Critical',page:1,context:'There is many reasons why the project was delayed.',original:'There is many',corrected:'There are many',explanation:'"reasons" is plural so the verb must be "are".'},
+      {id:5,type:'Grammar',severity:'Moderate',page:3,context:"He don't understand the new company policy on remote work.",original:"He don't",corrected:"He doesn't",explanation:'Third-person singular requires "doesn\'t" not "don\'t".'},
+      {id:6,type:'Punctuation',severity:'Moderate',page:2,context:'However the results were clear and the team was satisfied.',original:'However the',corrected:'However, the',explanation:'A comma is needed after the introductory adverb "However".'},
+      {id:7,type:'Punctuation',severity:'Moderate',page:4,context:"The system is broken its a known issue that affects all users.",original:"broken its a",corrected:"broken, it's a",explanation:'"its" is possessive; the contraction "it\'s" is needed here.'},
+      {id:8,type:'Capitalization',severity:'Minor',page:1,context:'Our division handles the internet of things product line.',original:'internet of things',corrected:'Internet of Things',explanation:'"Internet of Things" is a proper noun and should be capitalised.'},
+      {id:9,type:'Style',severity:'Minor',page:3,context:'We changed approach due to the fact that costs were rising.',original:'due to the fact that',corrected:'because',explanation:'"Due to the fact that" is wordy; "because" is cleaner.'},
+      {id:10,type:'Consistency',severity:'Minor',page:2,context:'Please e-mail the team. Email responses expected within 24 hrs.',original:'e-mail … email',corrected:'email (consistently)',explanation:'The document mixes "e-mail" and "email"; pick one form.'},
+      {id:11,type:'Clarity',severity:'Minor',page:4,context:'Once activated, the system does the thing automatically for all users.',original:'does the thing',corrected:'processes requests',explanation:'"Does the thing" is vague — specify the action performed.'},
     ],
   };
   demo._inputTok=1840; demo._outputTok=620; demo._model='claude-sonnet-4-6'; demo._cost=calcCost('claude-sonnet-4-6',1840,620);
   lastReport=demo; lastExtractedText='Demo document text — corrected version not available.';
   renderReport(demo); showTab('report');
   toast('Demo loaded — no API call made.');
+}
+
+// ══════════════════════════════════════════════
+// Check selector (Proof page)
+// ══════════════════════════════════════════════
+function renderProofChecks() {
+  const el = document.getElementById('check-chips');
+  el.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'check-sel-btn all-btn' + (selectedChecks.size===0?' on':'');
+  allBtn.textContent = 'All';
+  allBtn.onclick = () => { selectedChecks.clear(); renderProofChecks(); };
+  el.appendChild(allBtn);
+  ALL_TYPES.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'check-sel-btn' + (selectedChecks.has(t)?' on':'');
+    b.textContent = t;
+    if (selectedChecks.has(t)) b.style.background = TYPE_COLORS[t];
+    b.onclick = () => {
+      if (selectedChecks.has(t)) selectedChecks.delete(t); else selectedChecks.add(t);
+      renderProofChecks();
+    };
+    el.appendChild(b);
+  });
+}
+
+// ══════════════════════════════════════════════
+// Confirm modal
+// ══════════════════════════════════════════════
+function estimatePreflightCost(text, model, numChunks) {
+  const p = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-4-6'];
+  const inputTok  = Math.round((text.length / 4) * numChunks + 600 * numChunks);
+  const outputTok = Math.round(Math.max(1500, text.length / 80) * numChunks);
+  return (inputTok * p.in + outputTok * p.out) / 1_000_000;
+}
+
+let _pendingProofreadArgs = null;
+
+function showConfirmModal(file, pasteText, apiKey) {
+  const text = lastExtractedText || pasteText || '';
+  const words = docInfo.wordCount || countWords(text);
+  const model = document.getElementById('model').value;
+  const modelNames = { 'claude-sonnet-4-6':'Sonnet 4.6', 'claude-opus-4-7':'Opus 4.7', 'claude-haiku-4-5-20251001':'Haiku 4.5' };
+  const numChunks = Math.ceil(text.length / CHUNK_SIZE) || 1;
+  const estCost = estimatePreflightCost(text, model, numChunks);
+  const checks = selectedChecks.size===0 ? 'All checks' : [...selectedChecks].join(', ');
+  const fname = docInfo.filename || (file?.name) || 'Pasted text';
+
+  document.getElementById('cm-filename').textContent = fname;
+  document.getElementById('cm-words').textContent = words.toLocaleString();
+  document.getElementById('cm-chunks').textContent = numChunks === 1 ? '1 (single pass)' : `${numChunks} chunks`;
+  document.getElementById('cm-checks').textContent = checks;
+  document.getElementById('cm-model').textContent = modelNames[model] || model;
+  document.getElementById('cm-cost').textContent = estCost < 0.01 ? `~$${estCost.toFixed(4)}` : `~$${estCost.toFixed(3)}`;
+
+  _pendingProofreadArgs = { file, pasteText, apiKey };
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+function hideConfirmModal() {
+  document.getElementById('confirm-modal').classList.remove('open');
+  _pendingProofreadArgs = null;
+}
+
+async function confirmAndProofread() {
+  hideConfirmModal();
+  if (!_pendingProofreadArgs) return;
+  const { file, pasteText, apiKey } = _pendingProofreadArgs;
+  _pendingProofreadArgs = null;
+  await proofreadOne(file, pasteText, apiKey, true);
+}
+
+// ══════════════════════════════════════════════
+// Chunking
+// ══════════════════════════════════════════════
+function splitIntoChunks(text, size) {
+  if (text.length <= size) return [text];
+  const chunks = [];
+  let pos = 0;
+  while (pos < text.length) {
+    let end = pos + size;
+    if (end < text.length) {
+      const boundary = text.lastIndexOf('\n\n', end);
+      if (boundary > pos + size * 0.5) { end = boundary; }
+      else {
+        const sent = text.lastIndexOf('. ', end);
+        if (sent > pos + size * 0.5) end = sent + 1;
+      }
+    }
+    chunks.push(text.slice(pos, end).trim());
+    pos = end;
+  }
+  return chunks.filter(c => c.length > 0);
 }
 
 // ══════════════════════════════════════════════
@@ -791,13 +931,26 @@ async function runProofread() {
   if (!files.length && !pasteText) { toast('Upload a file or paste text first.','warn'); return; }
 
   if (files.length > 1) {
-    // Batch mode
     await runBatch(files, apiKey);
-  } else {
-    // Single mode
-    const file = files[0]?.file || null;
-    await proofreadOne(file, pasteText, apiKey, true);
+    return;
   }
+
+  // Extract first so confirm modal shows real word count
+  const file = files[0]?.file || null;
+  if (file) {
+    setLoading(true); setProgressStage('reading');
+    try {
+      docInfo = { filename:file.name, ext:file.name.split('.').pop().toLowerCase(), fileSize:file.size, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+      lastExtractedText = await extractText(file);
+    } catch(err) { toast('File error: '+err.message,'err'); setLoading(false); return; }
+    setLoading(false);
+  } else {
+    lastExtractedText = pasteText;
+    docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+    populateDocInfo(pasteText, null, null, null, 'txt', null);
+  }
+
+  showConfirmModal(file, pasteText, apiKey);
 }
 
 async function runBatch(items, apiKey) {
@@ -826,69 +979,116 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
   if (!file && !pasteText) return;
   resetProgress();
   if (showOnDone) setLoading(true);
-  setProgressStage('reading');
 
-  let text = '';
-  if (file) {
-    docInfo = { filename:file.name, ext:file.name.split('.').pop().toLowerCase(), fileSize:file.size, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
-    try { text = await extractText(file); }
-    catch(err) { if (showOnDone) { toast('File error: '+err.message,'err'); setLoading(false); } throw err; }
-  } else {
-    text = pasteText;
-    docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
-    populateDocInfo(text, null, null, null, 'txt', null);
+  // Text may already be extracted (single-file path via confirm modal)
+  let text = lastExtractedText;
+  if (!text) {
+    setProgressStage('reading');
+    if (file) {
+      docInfo = { filename:file.name, ext:file.name.split('.').pop().toLowerCase(), fileSize:file.size, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+      try { text = await extractText(file); }
+      catch(err) { if (showOnDone) { toast('File error: '+err.message,'err'); setLoading(false); } throw err; }
+    } else {
+      text = pasteText;
+      docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+      populateDocInfo(text, null, null, null, 'txt', null);
+    }
+    lastExtractedText = text;
   }
 
-  if (text.length > CHAR_LIMIT) {
-    toast('Document truncated to 140k chars.','warn');
-    text = text.slice(0, CHAR_LIMIT);
-  }
-  lastExtractedText = text;
-
-  setProgressStage('sending');
   const lang  = document.getElementById('language').value;
   const model = document.getElementById('model').value;
   const extra = document.getElementById('ai-instructions').value.trim();
-  const langLine = lang==='arabic'?'The document is in Arabic. Proofread it in Arabic.':lang==='english'?'The document is in English. Proofread it in English.':'Auto-detect the language and proofread accordingly.';
+
+  const langLine = lang==='arabic'
+    ? 'The document is in Arabic.'
+    : lang==='english'
+    ? 'The document is in English.'
+    : 'Auto-detect the document language.';
+
+  const checks = selectedChecks.size > 0 ? [...selectedChecks] : ALL_TYPES;
+  const checksLine = `Check ONLY these error types: ${checks.join(', ')}.`;
 
   const systemPrompt = `You are a professional proofreader. ${langLine}
+${checksLine}
 
-Proofread the document for these seven error types:
-Spelling, Grammar, Punctuation, Capitalization, Style, Consistency, Clarity.
+Error type definitions:
+- Typos: duplicate words (e.g. "the the"), repeated phrases, obvious keystroke errors. Always Critical severity.
+- Spelling: misspelled words.
+- Grammar: subject-verb agreement, wrong tense, fragments, run-ons.
+- Punctuation: missing/wrong commas, apostrophes, colons, full stops.
+- Capitalization: wrong capitalisation of proper nouns or sentence starts.
+- Style: wordy phrases, passive voice where active is clearer.
+- Consistency: same term spelled/formatted differently across the document.
+- Clarity: vague or ambiguous wording.
 
-For each error also assign a severity:
-- Critical: changes meaning or is clearly wrong (misspelling, wrong word, broken grammar)
-- Moderate: clear error that distracts from reading
-- Minor: style preference, consistency, or minor clarity issue
+Severity rules:
+- Critical: Typos (always), misspellings, broken grammar, wrong words that change meaning.
+- Moderate: Clear errors that distract but don't change meaning.
+- Minor: Style preferences, consistency, minor clarity issues.
 
-Return ONLY valid JSON (no markdown):
+IMPORTANT: Always write the "explanation" field in simple, plain English — even if the document is in another language. Keep explanations short and clear (one sentence).
+
+Return ONLY valid JSON (no markdown, no extra text):
 {
-  "language":"<name>","word_count":<int>,
-  "summary":{"total_errors":<int>,"Spelling":<int>,"Grammar":<int>,"Punctuation":<int>,"Capitalization":<int>,"Style":<int>,"Consistency":<int>,"Clarity":<int>},
-  "errors":[{"id":1,"type":"<category>","severity":"Critical|Moderate|Minor","context":"<full sentence ≤150 chars>","original":"<error phrase, substring of context>","corrected":"<fix>","explanation":"<one sentence>"}]
-}${extra?'\n\nAdditional user instructions:\n'+extra:''}`;
+  "language":"<detected language name>",
+  "word_count":<int>,
+  "summary":{"total_errors":<int>,"Typos":<int>,"Spelling":<int>,"Grammar":<int>,"Punctuation":<int>,"Capitalization":<int>,"Style":<int>,"Consistency":<int>,"Clarity":<int>},
+  "errors":[{"id":1,"type":"<type>","severity":"Critical|Moderate|Minor","context":"<sentence containing error, ≤150 chars>","original":"<exact error text>","corrected":"<fix>","explanation":"<one plain-English sentence>"}]
+}${extra?'\n\nAdditional instructions:\n'+extra:''}`;
+
+  const chunks = splitIntoChunks(text, CHUNK_SIZE);
+  let allErrors = [], totalInputTok = 0, totalOutputTok = 0;
+  let detectedLang = '', totalWordCount = 0;
+  const summaryTotals = {};
+  ALL_TYPES.forEach(t => summaryTotals[t] = 0);
 
   setProgressStage('analyzing');
+
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-      body:JSON.stringify({ model, max_tokens:8192, system:systemPrompt, messages:[{role:'user',content:'Proofread this document:\n\n'+text}] }),
-    });
-    if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`API error ${res.status}`); }
-    const data  = await res.json();
-    const raw   = data.content[0].text.replace(/^```json?\s*/i,'').replace(/\s*```$/i,'').trim();
+    for (let ci = 0; ci < chunks.length; ci++) {
+      if (chunks.length > 1) {
+        document.getElementById('loading-title').textContent = `Analyzing chunk ${ci+1} of ${chunks.length}…`;
+        document.getElementById('loading-sub').textContent = `Sending chunk ${ci+1} to Claude…`;
+        document.getElementById('progress-bar').style.width = (40 + (ci / chunks.length) * 50) + '%';
+      }
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+        body:JSON.stringify({ model, max_tokens:16000, system:systemPrompt, messages:[{role:'user',content:`Proofread this document${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}] }),
+      });
+      if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`API error ${res.status}`); }
+      const data = await res.json();
+      const raw  = data.content[0].text.replace(/^```json?\s*/i,'').replace(/\s*```$/i,'').trim();
+      const chunk_report = JSON.parse(raw);
+
+      if (!detectedLang && chunk_report.language) detectedLang = chunk_report.language;
+      if (chunk_report.word_count) totalWordCount += chunk_report.word_count;
+      if (data.usage) { totalInputTok += data.usage.input_tokens||0; totalOutputTok += data.usage.output_tokens||0; }
+
+      const idOffset = allErrors.length;
+      (chunk_report.errors||[]).forEach((e, idx) => {
+        e.id = idOffset + idx + 1;
+        if (docInfo.pageTexts.length && !e.page) e.page = findPage(e.original) || findPage(e.context);
+        allErrors.push(e);
+        if (summaryTotals[e.type] !== undefined) summaryTotals[e.type]++;
+      });
+    }
 
     setProgressStage('building');
-    const report = JSON.parse(raw);
-    if (!report.word_count && docInfo.wordCount) report.word_count = docInfo.wordCount;
-    if (docInfo.pageTexts.length) report.errors.forEach(e=>{ if(!e.page) e.page=findPage(e.original)||findPage(e.context); });
-    if (data.usage) {
-      report._inputTok  = data.usage.input_tokens  || 0;
-      report._outputTok = data.usage.output_tokens || 0;
-      report._model     = model;
-      report._cost      = calcCost(model, report._inputTok, report._outputTok);
-    }
+    const summary = { total_errors: allErrors.length, ...summaryTotals };
+    const report = {
+      language: detectedLang || docInfo.language,
+      word_count: totalWordCount || docInfo.wordCount,
+      summary,
+      errors: allErrors,
+      _checks: selectedChecks.size > 0 ? [...selectedChecks] : null,
+      _inputTok: totalInputTok,
+      _outputTok: totalOutputTok,
+      _model: model,
+      _cost: calcCost(model, totalInputTok, totalOutputTok),
+    };
 
     lastReport = report;
     saveToHistory(report);
@@ -899,7 +1099,7 @@ Return ONLY valid JSON (no markdown):
     console.error(err);
     throw err;
   } finally {
-    if (showOnDone) setLoading(false);
+    if (showOnDone) { setLoading(false); document.getElementById('loading-title').textContent='Analyzing document…'; }
   }
 }
 
@@ -942,12 +1142,16 @@ function renderReport(r) {
 
   // Checked summary
   const cs=document.getElementById('checked-summary');
-  cs.innerHTML=ALL_TYPES.map(t=>{
+  const ranTypes = r._checks ? r._checks : ALL_TYPES;
+  cs.innerHTML = ranTypes.map(t=>{
     const cnt=r.summary[t]||0;
     return cnt>0
       ? `<span class="check-chip check-found" style="border-color:${TYPE_COLORS[t]}55;color:${TYPE_COLORS[t]};background:${TYPE_COLORS[t]}15">${t} <strong>${cnt}</strong></span>`
       : `<span class="check-chip check-clean">✓ ${t}</span>`;
   }).join('');
+  if (r._checks) {
+    cs.innerHTML += `<span class="check-chip" style="background:rgba(99,102,241,.1);color:var(--accent);border:1px solid rgba(99,102,241,.2);margin-left:4px">Checked: ${r._checks.join(', ')}</span>`;
+  }
 
   // Stats
   const grid=document.getElementById('stats-grid');
@@ -1306,6 +1510,7 @@ function saveSetup() {
   const t=localStorage.getItem('proof_theme')||'dark';
   document.documentElement.dataset.theme=t;
   document.getElementById('theme-btn').textContent=t==='light'?'☀️':'🌙';
+  renderProofChecks();
 })();
 </script>
 </body>
