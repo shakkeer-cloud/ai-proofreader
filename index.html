@@ -191,12 +191,19 @@
     .sev-Critical { color:#ef4444; }
     .sev-Moderate { color:#f97316; }
     .sev-Minor    { color:var(--muted); }
-    .pg-num { font-size:11px; color:var(--muted); font-weight:600; }
+    .pg-num { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
     .context-snippet { font-size:12px; line-height:1.6; }
     mark.orig-mark { background:var(--mark-orig-bg); color:var(--mark-orig-fg); border-radius:3px; padding:1px 2px; font-weight:700; }
     mark.corr-mark { background:var(--mark-corr-bg); color:var(--mark-corr-fg); border-radius:3px; padding:1px 2px; font-weight:700; }
     .copy-btn { background:none; border:none; cursor:pointer; color:var(--muted); padding:3px 5px; border-radius:4px; transition:all .15s; display:inline-flex; align-items:center; }
     .copy-btn:hover { color:var(--accent); background:rgba(99,102,241,.1); }
+    .triage-btn { background:none; border:1px solid var(--border); border-radius:4px; cursor:pointer; padding:1px 6px; font-size:12px; line-height:1.6; transition:all .15s; color:var(--muted); margin-left:3px; vertical-align:middle; }
+    .triage-btn.t-fixed { background:#10b98122; color:#10b981; border-color:#10b98144; }
+    .triage-btn.t-false { background:#ef444422; color:#ef4444; border-color:#ef444444; }
+    tr.row-fixed td:not(.triage-cell) { opacity:.45; text-decoration:line-through; }
+    tr.row-false  td:not(.triage-cell) { opacity:.28; }
+    tr.row-fixed td.triage-cell, tr.row-false td.triage-cell { text-decoration:none; opacity:1; }
+    .triage-summary { font-size:11px; color:var(--muted); margin-top:5px; display:flex; gap:10px; }
     .copy-btn svg { width:13px; height:13px; }
 
     /* ── Empty + cards ── */
@@ -255,7 +262,7 @@
       header h1 { color:#111 !important; font-size:14pt !important; }
       header p { color:#555 !important; }
       .logo svg path { fill:#111 !important; }
-      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .sev-filter-bar, .analyse-panel, .header-actions, .export-dropdown, .app-footer { display:none !important; }
+      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .sev-filter-bar, .analyse-panel, .header-actions, .export-dropdown, .app-footer, .triage-cell { display:none !important; }
       #report-page { display:block !important; }
       .page { max-width:100% !important; padding:8px 12px !important; }
       #report-cost { display:block !important; color:#555 !important; }
@@ -425,14 +432,16 @@
   </div>
 
   <div id="report-content" style="display:none">
-    <div id="partial-warning" style="display:none;background:#f9731615;border:1px solid #f9731640;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#f97316">
-      ⚠️ <strong>Partial analysis</strong> — <span id="partial-warning-text"></span>. Errors below cover the completed portion only. Re-upload or wait 1 min and retry for full coverage.
+    <div id="partial-warning" style="display:none;background:#f9731615;border:1px solid #f9731640;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#f97316;display:none;align-items:center;gap:10px;flex-wrap:wrap">
+      ⚠️ <strong>Partial analysis</strong> — <span id="partial-warning-text"></span>. Errors below cover the completed portion only.
+      <button id="partial-retry-btn" onclick="retryFailedChunks()" style="display:none;background:#f9731622;border:1px solid #f9731660;border-radius:6px;color:#f97316;font-size:11px;font-weight:700;padding:4px 12px;cursor:pointer;white-space:nowrap">▶ Continue from chunk <span id="partial-retry-label"></span></button>
     </div>
     <div class="report-header">
       <div class="report-header-left">
         <div class="report-title">Proofreading Report</div>
         <div class="report-meta" id="report-meta"></div>
         <div id="report-cost" style="display:none;font-size:11px;color:var(--muted);margin-top:3px;"></div>
+        <div class="triage-summary" id="triage-summary" style="display:none"></div>
       </div>
       <div class="score-wrap" id="score-wrap" style="display:none">
         <div class="score-circle" id="score-circle">
@@ -488,14 +497,14 @@
           <col class="col-id"><col class="col-type">
           <col class="col-pg" id="col-pg">
           <col class="col-orig"><col class="col-corr">
-          <col class="col-copy"><col class="col-expl">
+          <col class="col-copy"><col style="width:56px"><col class="col-expl">
         </colgroup>
         <thead>
           <tr>
             <th>#</th><th>Type</th>
             <th id="th-pg">Pg</th>
             <th>Original</th><th>Corrected</th>
-            <th></th><th>Explanation</th>
+            <th></th><th>Status</th><th>Explanation</th>
           </tr>
         </thead>
         <tbody id="error-body"></tbody>
@@ -535,11 +544,21 @@
       Exports: PDF, Word, corrected document, shareable HTML.
     </p>
   </div>
+  <div class="card">
+    <h3>📖 Custom Glossary</h3>
+    <p class="help">Words, names, or terms that should <strong>never</strong> be flagged as errors — brand names, proper nouns, technical terms. One per line.</p>
+    <textarea id="glossary-input" rows="6" style="width:100%;margin-top:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--sf2);color:var(--text);font-size:12px;resize:vertical;font-family:inherit;line-height:1.6" placeholder="e.g.&#10;MBRGI&#10;Deepal S05&#10;Al Maktoum&#10;Kenanagan"></textarea>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+      <button class="btn btn-primary" onclick="saveGlossary()">Save Glossary</button>
+      <span id="glossary-saved" style="display:none;font-size:12px;color:#10b981">✓ Saved</span>
+    </div>
+  </div>
 </div>
 
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
-  <span class="app-footer-version">v2.4.1</span>
+  <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
+  <span class="app-footer-version">v2.5.0</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -594,6 +613,7 @@ const GRADE_CONFIG = [
 const CHAR_LIMIT = 300000;
 const CHUNK_SIZE  = 45000;   // ~16k tokens/chunk — safely under 30k tokens/min rate limit
 const RATE_LIMIT_WAIT_S = 75; // seconds to pause between chunks (generous buffer for sliding window)
+const CHUNK_OVERLAP    = 400; // chars of tail overlap between consecutive chunks to catch boundary errors
 const MODEL_PRICING = {
   'claude-sonnet-4-6':       { in: 3.00,  out: 15.00 },
   'claude-opus-4-7':         { in: 15.00, out: 75.00 },
@@ -644,6 +664,9 @@ let activeSevFilter  = new Set();
 let selectedChecks   = new Set(); // empty = All
 let progressAnim     = null;
 let docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+let errorTriageState = {};   // {errorId: 'fixed'|'false'} — user triage of each error row
+let _retryState      = null; // stored context for continuing a partial proofreading run
+let _sessionCost     = 0;    // USD spent this browser session
 
 // ══════════════════════════════════════════════
 // Theme
@@ -652,7 +675,10 @@ function startNewDocument() {
   lastReport = null;
   lastExtractedText = '';
   fileQueue = [];
+  errorTriageState = {};
+  _retryState = null;
   docInfo = {filename:'',ext:'',fileSize:0,pages:null,pageTexts:[],wordCount:0,charCount:0,paraCount:0,images:null,graphics:null,tables:null,language:''};
+  localStorage.removeItem('proof_last_report');
   document.getElementById('paste-area').value = '';
   const fi = document.getElementById('file-input'); if (fi) fi.value = '';
   renderFileQueue();
@@ -1105,7 +1131,15 @@ function getChunkPageRange(chunkText) {
 }
 
 async function sleepWithCountdown(seconds, onTick) {
-  for (let s=seconds; s>0; s--) { onTick(s); await new Promise(r=>setTimeout(r,1000)); }
+  // Use Date.now() so browser background-tab throttling doesn't stall the countdown
+  const endMs = Date.now() + seconds * 1000;
+  onTick(seconds);
+  while (true) {
+    const rem = Math.ceil((endMs - Date.now()) / 1000);
+    if (rem <= 0) break;
+    onTick(rem);
+    await new Promise(r => setTimeout(r, Math.min(1000, Math.max(50, endMs - Date.now()))));
+  }
 }
 
 async function callApiWithRetry(payload, apiKey, ci, total, showUI) {
@@ -1139,6 +1173,9 @@ async function callApiWithRetry(payload, apiKey, ci, total, showUI) {
 async function runProofread() {
   const apiKey = localStorage.getItem('proof_api_key');
   if (!apiKey) { toast('Set your API key in Setup first.','warn'); showTab('setup'); return; }
+
+  // Request OS notification permission from this user gesture (for background completion alerts)
+  requestNotificationPermission();
 
   const files = fileQueue.filter(q=>q.status==='waiting');
   const pasteText = document.getElementById('paste-area').value.trim();
@@ -1253,6 +1290,7 @@ IMPORTANT RULES:
 1. In "original" and "corrected" fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
 2. The text contains "--- Page N ---" markers. Use these to set the "page" field for every error. The "page" field is REQUIRED — every error must have a page number.
 3. Always write "explanation" in plain English (one sentence), even for non-English documents.
+4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt whether something is an error, do NOT flag it. Every explanation must clearly state what is wrong — never write that the text is correct or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
@@ -1267,7 +1305,7 @@ Return ONLY valid JSON (no markdown, no extra text):
     ? docInfo.pageTexts.map((t,i)=>`--- Page ${i+1} ---\n${t}`).join('\n\n')
     : text;
 
-  const chunks = splitIntoChunks(pagedText, CHUNK_SIZE);
+  const chunks = addChunkOverlap(splitIntoChunks(pagedText, CHUNK_SIZE), CHUNK_OVERLAP);
   let allErrors = [], totalInputTok = 0, totalOutputTok = 0;
   let detectedLang = '', totalWordCount = 0;
   const summaryTotals = {};
@@ -1287,9 +1325,9 @@ Return ONLY valid JSON (no markdown, no extra text):
         const remSec = estimateProofreadTime(chunks.length - ci);
         await sleepWithCountdown(RATE_LIMIT_WAIT_S, s => {
           if (showOnDone) {
-            document.getElementById('loading-title').textContent = `Chunk ${ci} of ${chunks.length} complete`;
+            document.getElementById('loading-title').textContent = `Chunk ${ci} of ${chunks.length} complete · ${allErrors.length} issues found`;
             document.getElementById('loading-sub').textContent =
-              `Next chunk in ${s}s · ${fmtTime(remSec)} remaining`;
+              `Next chunk in ${s}s · ${fmtTime(s + remSec)} remaining`;
             document.getElementById('progress-bar').style.width = (30 + (ci / chunks.length) * 60) + '%';
           }
         });
@@ -1303,14 +1341,15 @@ Return ONLY valid JSON (no markdown, no extra text):
       if (showOnDone) {
         document.getElementById('loading-title').textContent =
           `Analyzing chunk ${ci+1} of ${chunks.length}${pLabel}`;
-        document.getElementById('loading-sub').textContent = `Sending to Claude…${remLabel}`;
+        const soFarLabel = allErrors.length > 0 ? ` · ${allErrors.length} issues so far` : '';
+        document.getElementById('loading-sub').textContent = `Sending to Claude…${remLabel}${soFarLabel}`;
         document.getElementById('progress-bar').style.width =
           (30 + ((ci + 0.5) / chunks.length) * 60) + '%';
       }
 
       try {
         const res = await callApiWithRetry({
-          model, max_tokens:16000, system:systemPrompt,
+          model, max_tokens:16000, temperature:0, system:systemPrompt,
           messages:[{role:'user', content:
             `Proofread this text${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}]
         }, apiKey, ci+1, chunks.length, showOnDone);
@@ -1324,14 +1363,16 @@ Return ONLY valid JSON (no markdown, no extra text):
         if (data.usage) { totalInputTok += data.usage.input_tokens||0; totalOutputTok += data.usage.output_tokens||0; }
 
         const idOffset = allErrors.length;
-        (chunk_report.errors||[]).forEach((e, idx) => {
+        // Filter out self-contradicting errors (Claude flagged something but explanation says no error)
+        const validErrors = (chunk_report.errors||[]).filter(e => !isFalsePositive(e));
+        validErrors.forEach((e, idx) => {
           e.id = idOffset + idx + 1;
           // Fallback: if Claude didn't return page, try to find it client-side
           if (!e.page && docInfo.pageTexts.length)
             e.page = findPage(e.original) || findPage(e.context);
           allErrors.push(e);
           if (summaryTotals[e.type] !== undefined) summaryTotals[e.type]++;
-        });
+        }); // end validErrors.forEach
         completedChunks++;
 
       } catch(chunkErr) {
@@ -1371,14 +1412,27 @@ Return ONLY valid JSON (no markdown, no extra text):
       }
     }
 
+    // Store retry context for the "Continue" button when partial
+    if (partialFromChunk > 0) {
+      _retryState = {chunks, startChunkIdx: partialFromChunk, model, systemPrompt};
+    } else {
+      _retryState = null;
+    }
+
     // Always generate a report if any chunks completed
     if (completedChunks > 0) {
       setProgressStage('building');
-      const summary = { total_errors: allErrors.length, ...summaryTotals };
+      // Deduplicate errors that may appear in both sides of chunk overlap boundaries
+      const finalErrors = deduplicateErrors(allErrors);
+      finalErrors.forEach((e, i) => { e.id = i + 1; });
+      const finalTotals = {};
+      ALL_TYPES.forEach(t => finalTotals[t] = 0);
+      finalErrors.forEach(e => { if (finalTotals[e.type] !== undefined) finalTotals[e.type]++; });
+      const summary = { total_errors: finalErrors.length, ...finalTotals };
       const report = {
         language: detectedLang || docInfo.language,
         word_count: docInfo.wordCount || totalWordCount, // client-side count is authoritative
-        summary, errors: allErrors,
+        summary, errors: finalErrors,
         _checks: selectedChecks.size > 0 ? [...selectedChecks] : null,
         _inputTok: totalInputTok, _outputTok: totalOutputTok,
         _model: model,
@@ -1386,13 +1440,18 @@ Return ONLY valid JSON (no markdown, no extra text):
         _partial: partialFromChunk > 0 ? { completed: completedChunks, total: chunks.length } : null,
       };
       lastReport = report;
+      errorTriageState = {};
       saveToHistory(report);
+      saveLastReport(report);
+      trackCost(report._cost || 0);
       completeProgress();
       if (showOnDone) {
         renderReport(report);
         showTab('report');
-        if (!partialFromChunk)
+        if (!partialFromChunk) {
           toast(`Found ${report.summary.total_errors} issue${report.summary.total_errors!==1?'s':''}.`);
+          sendCompletionNotification(report);
+        }
       }
     } else {
       // Zero chunks completed — throw to outer catch for error display
@@ -1430,10 +1489,24 @@ function renderReport(r) {
   // Partial warning
   const pw=document.getElementById('partial-warning');
   if (r._partial) {
-    pw.style.display='block';
+    pw.style.display='flex';
     document.getElementById('partial-warning-text').textContent=
       `${r._partial.completed} of ${r._partial.total} chunks analyzed`;
-  } else { pw.style.display='none'; }
+    const retryBtn = document.getElementById('partial-retry-btn');
+    const retryLabel = document.getElementById('partial-retry-label');
+    if (retryBtn) {
+      if (_retryState) {
+        if (retryLabel) retryLabel.textContent = `${r._partial.completed + 1} of ${r._partial.total}`;
+        retryBtn.style.display = 'inline-block';
+      } else {
+        retryBtn.style.display = 'none';
+      }
+    }
+  } else {
+    pw.style.display='none';
+    const retryBtn = document.getElementById('partial-retry-btn');
+    if (retryBtn) retryBtn.style.display = 'none';
+  }
 
   // Meta — use client-side word count as authoritative
   const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
@@ -1573,7 +1646,10 @@ function renderTable(errors) {
   errors.forEach(e=>{
     const c=TYPE_COLORS[e.type]||'#94a3b8';
     const sevCls=e.severity==='Critical'?'sev-Critical':e.severity==='Moderate'?'sev-Moderate':'sev-Minor';
+    const triage=errorTriageState[e.id]||'';
     const tr=document.createElement('tr');
+    if (triage==='fixed') tr.classList.add('row-fixed');
+    else if (triage==='false') tr.classList.add('row-false');
     tr.innerHTML=`
       <td style="color:var(--muted);font-weight:700;font-size:11px">${e.id}</td>
       <td><span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${esc(e.type)}</span>
@@ -1583,6 +1659,10 @@ function renderTable(errors) {
       <td class="context-snippet">${buildCtx(e.context,e.original,'orig-mark')}</td>
       <td class="context-snippet">${buildCtx(e.context,e.original,'corr-mark',e.corrected)}</td>
       <td><button class="copy-btn" onclick="copyText('${esc(e.corrected).replace(/'/g,"&#39;")}',this)" title="Copy corrected text"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></td>
+      <td class="triage-cell" style="white-space:nowrap">
+        <button class="triage-btn${triage==='fixed'?' t-fixed':''}" onclick="triageError(${e.id},'fixed')" title="Mark as fixed">✓</button>
+        <button class="triage-btn${triage==='false'?' t-false':''}" onclick="triageError(${e.id},'false')" title="Mark as false positive">✗</button>
+      </td>
       <td style="font-size:11px;color:var(--muted)">${esc(e.explanation)}</td>`;
     tbody.appendChild(tr);
   });
@@ -1978,6 +2058,292 @@ function saveSetup() {
 }
 
 // ══════════════════════════════════════════════
+// False-positive filter
+// ══════════════════════════════════════════════
+const FALSE_POS_PHRASES = [
+  'no error','not an error','correct as written','grammatically correct',
+  'no issue','no mistake','correctly written','no correction needed',
+  'is correct','already correct','no problem','no error found',
+  'correct grammar','well formed','well-formed','found upon review',
+  'sentence is correct','text is correct',
+];
+function isFalsePositive(error) {
+  if (!error || !error.explanation) return false;
+  const expl = error.explanation.toLowerCase();
+  return FALSE_POS_PHRASES.some(p => expl.includes(p));
+}
+
+// ══════════════════════════════════════════════
+// Chunk overlap & deduplication
+// ══════════════════════════════════════════════
+function addChunkOverlap(chunks, overlapChars) {
+  if (chunks.length <= 1 || !overlapChars) return chunks;
+  return chunks.map((chunk, i) => {
+    if (i === 0) return chunk;
+    let tail = chunks[i - 1].slice(-overlapChars);
+    // Find a clean sentence boundary so the overlap starts mid-sentence as rarely as possible
+    const sentBreaks = [...tail.matchAll(/[.!?]\s+/g)];
+    if (sentBreaks.length) {
+      const last = sentBreaks[sentBreaks.length - 1];
+      const after = last.index + last[0].length;
+      if (after < tail.length * 0.8) tail = tail.slice(after);
+    }
+    return tail + '\n' + chunk;
+  });
+}
+
+function deduplicateErrors(errors) {
+  const seen = new Set();
+  return errors.filter(e => {
+    // Key by page + first 50 chars of normalised original text
+    const key = `${e.page||0}|${(e.original||'').toLowerCase().trim().slice(0, 50)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// ══════════════════════════════════════════════
+// OS notifications
+// ══════════════════════════════════════════════
+async function requestNotificationPermission() {
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  try { await Notification.requestPermission(); } catch(e) {}
+}
+
+function sendCompletionNotification(report) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!document.hidden) return; // user is already looking at the page
+  const filename = docInfo.filename || 'document';
+  const issues = report.summary.total_errors;
+  try {
+    const n = new Notification('✅ Proofreading Complete', {
+      body: `${issues} issue${issues !== 1 ? 's' : ''} found in ${filename}`,
+    });
+    n.onclick = () => { window.focus(); showTab('report'); n.close(); };
+    setTimeout(() => n.close(), 8000);
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
+// Triage (accept / reject per row)
+// ══════════════════════════════════════════════
+function triageError(id, status) {
+  // Toggle: clicking same status again removes it
+  if (errorTriageState[id] === status) {
+    delete errorTriageState[id];
+  } else {
+    errorTriageState[id] = status;
+  }
+  updateTriageSummary();
+  // Re-render current filtered view
+  if (lastReport) {
+    const filtered = (lastReport.errors||[]).filter(e =>
+      (activeFilters.size===0 || activeFilters.has(e.type)) &&
+      (activeSevFilter.size===0 || activeSevFilter.has(e.severity))
+    );
+    renderTable(filtered);
+  }
+}
+
+function updateTriageSummary() {
+  const fixed   = Object.values(errorTriageState).filter(s => s === 'fixed').length;
+  const falsePos = Object.values(errorTriageState).filter(s => s === 'false').length;
+  const el = document.getElementById('triage-summary');
+  if (!el) return;
+  if (fixed === 0 && falsePos === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  const parts = [];
+  if (fixed)    parts.push(`<span style="color:#10b981">✓ ${fixed} fixed</span>`);
+  if (falsePos) parts.push(`<span style="color:#ef4444">✗ ${falsePos} false positive${falsePos>1?'s':''}</span>`);
+  el.innerHTML = parts.join('<span style="color:var(--border);margin:0 2px"> · </span>');
+}
+
+// ══════════════════════════════════════════════
+// Continue partial proofreading
+// ══════════════════════════════════════════════
+async function retryFailedChunks() {
+  if (!_retryState || !lastReport) { toast('Nothing to continue.','warn'); return; }
+  const apiKey = localStorage.getItem('proof_api_key');
+  if (!apiKey) { toast('Set your API key in Setup first.','warn'); showTab('setup'); return; }
+
+  const {chunks, startChunkIdx, model, systemPrompt} = _retryState;
+  setLoading(true);
+  setProgressStage('analyzing');
+
+  const newErrors = [...lastReport.errors];
+  let newInputTok = lastReport._inputTok || 0;
+  let newOutputTok = lastReport._outputTok || 0;
+  let newPartialStart = -1;
+  let completedNew = 0;
+
+  try {
+    for (let ci = startChunkIdx; ci < chunks.length; ci++) {
+      if (ci > startChunkIdx) {
+        const remSec = estimateProofreadTime(chunks.length - ci);
+        await sleepWithCountdown(RATE_LIMIT_WAIT_S, s => {
+          document.getElementById('loading-title').textContent =
+            `Resuming — chunk ${ci} of ${chunks.length} · ${newErrors.length} issues found`;
+          document.getElementById('loading-sub').textContent =
+            `Next chunk in ${s}s · ${fmtTime(s + remSec)} remaining`;
+          document.getElementById('progress-bar').style.width = (30 + (ci / chunks.length) * 60) + '%';
+        });
+      }
+      const pRange = getChunkPageRange(chunks[ci]);
+      const pLabel = pRange ? ` · ${pRange}` : '';
+      document.getElementById('loading-title').textContent = `Analyzing chunk ${ci+1} of ${chunks.length}${pLabel}`;
+      document.getElementById('loading-sub').textContent = `Sending to Claude… · ${newErrors.length} issues found`;
+      document.getElementById('progress-bar').style.width = (30 + ((ci + 0.5) / chunks.length) * 60) + '%';
+
+      try {
+        const res = await callApiWithRetry({
+          model, max_tokens:16000, temperature:0, system:systemPrompt,
+          messages:[{role:'user', content:
+            `Proofread this text (part ${ci+1} of ${chunks.length}):\n\n${chunks[ci]}`}]
+        }, apiKey, ci+1, chunks.length, true);
+
+        const data = await res.json();
+        const chunk_report = parseClaudeJSON(data.content[0].text);
+        if (data.usage) { newInputTok += data.usage.input_tokens||0; newOutputTok += data.usage.output_tokens||0; }
+
+        const idOffset = newErrors.length;
+        const validErrors = (chunk_report.errors||[]).filter(e => !isFalsePositive(e));
+        validErrors.forEach((e, idx) => {
+          e.id = idOffset + idx + 1;
+          if (!e.page && docInfo.pageTexts.length)
+            e.page = findPage(e.original) || findPage(e.context);
+          newErrors.push(e);
+        });
+        completedNew++;
+
+      } catch(chunkErr) {
+        newPartialStart = ci + 1;
+        const msg = chunkErr.message||'';
+        if (isRateLimitError(msg)) {
+          showApiError('Rate limit reached',
+            `Rate limit hit on chunk ${ci+1}.<br><br>Wait 1–2 minutes and click <strong>Continue</strong> again.`);
+        } else {
+          toast(`Chunk ${ci+1} error: ${msg}`, 'err');
+        }
+        break;
+      }
+    }
+
+    // Dedup, re-ID, rebuild summary
+    const dedupedErrors = deduplicateErrors(newErrors);
+    dedupedErrors.forEach((e, i) => { e.id = i + 1; });
+    const finalTotals = {}; ALL_TYPES.forEach(t => finalTotals[t] = 0);
+    dedupedErrors.forEach(e => { if (finalTotals[e.type] !== undefined) finalTotals[e.type]++; });
+    finalTotals.total_errors = dedupedErrors.length;
+
+    const prevCompleted = lastReport._partial?.completed || startChunkIdx;
+    const totalCompleted = prevCompleted + completedNew;
+    const prevCost = lastReport._cost || 0;
+    const addedCost = calcCost(model, newInputTok - (lastReport._inputTok||0), newOutputTok - (lastReport._outputTok||0));
+
+    const updatedReport = {
+      ...lastReport,
+      summary: finalTotals,
+      errors: dedupedErrors,
+      _inputTok: newInputTok, _outputTok: newOutputTok,
+      _cost: prevCost + addedCost,
+      _partial: newPartialStart > 0 ? {completed: totalCompleted, total: chunks.length} : null,
+    };
+
+    lastReport = updatedReport;
+    _retryState = newPartialStart > 0 ? {..._retryState, startChunkIdx: newPartialStart} : null;
+    errorTriageState = {};
+    saveToHistory(updatedReport);
+    saveLastReport(updatedReport);
+    trackCost(addedCost);
+    completeProgress();
+    renderReport(updatedReport);
+
+    if (!newPartialStart) {
+      toast(`Complete! ${finalTotals.total_errors} issues found total.`);
+      sendCompletionNotification(updatedReport);
+    }
+
+  } catch(err) {
+    toast('Error: ' + err.message, 'err');
+    console.error(err);
+  } finally {
+    setLoading(false);
+    document.getElementById('loading-title').textContent = 'Analyzing document…';
+  }
+}
+
+// ══════════════════════════════════════════════
+// Report persistence (survives page refresh)
+// ══════════════════════════════════════════════
+function saveLastReport(report) {
+  try {
+    localStorage.setItem('proof_last_report', JSON.stringify({
+      report, di: {...docInfo}, ts: Date.now()
+    }));
+  } catch(e) {} // localStorage full — ignore
+}
+
+function loadSavedReport() {
+  try {
+    const raw = localStorage.getItem('proof_last_report');
+    if (!raw) return;
+    const {report, di, ts} = JSON.parse(raw);
+    if (Date.now() - ts > 24 * 3600 * 1000) return; // expire after 24 h
+    lastReport = report;
+    docInfo = di;
+    renderReport(report);
+    // Switch to report tab silently (no toast — user may not expect it)
+    showTab('report');
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
+// Glossary
+// ══════════════════════════════════════════════
+function getGlossary() {
+  try {
+    return (localStorage.getItem('proof_glossary') || '')
+      .split('\n').map(s => s.trim()).filter(Boolean);
+  } catch(e) { return []; }
+}
+
+function saveGlossary() {
+  const val = document.getElementById('glossary-input')?.value || '';
+  localStorage.setItem('proof_glossary', val);
+  const saved = document.getElementById('glossary-saved');
+  if (saved) { saved.style.display = 'inline'; setTimeout(() => saved.style.display = 'none', 2000); }
+}
+
+// ══════════════════════════════════════════════
+// Cost tracking
+// ══════════════════════════════════════════════
+function trackCost(costUsd) {
+  if (!costUsd || costUsd <= 0) return;
+  _sessionCost += costUsd;
+  try {
+    const stats = JSON.parse(localStorage.getItem('proof_cost_stats') || '{"total":0,"runs":0}');
+    stats.total = (stats.total || 0) + costUsd;
+    stats.runs  = (stats.runs  || 0) + 1;
+    localStorage.setItem('proof_cost_stats', JSON.stringify(stats));
+  } catch(e) {}
+  updateCostFooter();
+}
+
+function updateCostFooter() {
+  const el = document.getElementById('cost-footer');
+  if (!el) return;
+  try {
+    const stats = JSON.parse(localStorage.getItem('proof_cost_stats') || '{"total":0,"runs":0}');
+    const fmt = v => v < 0.001 ? `<$0.001` : v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(3)}`;
+    const parts = [];
+    if (_sessionCost > 0) parts.push(`Session: ${fmt(_sessionCost)}`);
+    if (stats.total > 0)  parts.push(`All-time: ${fmt(stats.total)} (${stats.runs} run${stats.runs!==1?'s':''})`);
+    el.textContent = parts.join(' · ');
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
 // Init
 // ══════════════════════════════════════════════
 (function init() {
@@ -1988,6 +2354,13 @@ function saveSetup() {
   document.documentElement.dataset.theme=t;
   document.getElementById('theme-btn').textContent=t==='light'?'☀️':'🌙';
   renderProofChecks();
+  // Load glossary into Setup textarea
+  const g = localStorage.getItem('proof_glossary') || '';
+  const gi = document.getElementById('glossary-input'); if (gi) gi.value = g;
+  // Show all-time cost in footer (session starts at 0 each load)
+  updateCostFooter();
+  // Restore last report if it was saved within the past 24 hours
+  loadSavedReport();
 })();
 </script>
 </body>
