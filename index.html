@@ -1289,7 +1289,7 @@ Severity rules:
 IMPORTANT RULES:
 1. In "original" and "corrected" fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
 2. The text contains "--- Page N ---" markers. Use these to set the "page" field for every error. The "page" field is REQUIRED — every error must have a page number.
-3. Always write "explanation" in plain English (one sentence), even for non-English documents.
+3. Always write "explanation" in plain English (one short sentence, max 20 words), even for non-English documents.
 4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt whether something is an error, do NOT flag it. Every explanation must clearly state what is wrong — never write that the text is correct or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}
 
 Return ONLY valid JSON (no markdown, no extra text):
@@ -1347,69 +1347,84 @@ Return ONLY valid JSON (no markdown, no extra text):
           (30 + ((ci + 0.5) / chunks.length) * 60) + '%';
       }
 
-      try {
-        const res = await callApiWithRetry({
-          model, max_tokens:16000, temperature:0, system:systemPrompt,
-          messages:[{role:'user', content:
-            `Proofread this text${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}]
-        }, apiKey, ci+1, chunks.length, showOnDone);
+      // Inner retry loop — auto-retries up to 3× on JSON parse/truncation errors
+      // (No wait needed between parse retries — it's not a rate-limit issue)
+      let chunkDone = false;
+      for (let parseAttempt = 0; parseAttempt < 3 && !chunkDone; parseAttempt++) {
+        if (parseAttempt > 0 && showOnDone) {
+          document.getElementById('loading-title').textContent =
+            `Chunk ${ci+1} — retrying (attempt ${parseAttempt+1}/3)`;
+          document.getElementById('loading-sub').textContent = `JSON parse failed — resending to Claude…`;
+          await new Promise(r => setTimeout(r, 3000)); // brief pause before retry
+        }
+        try {
+          const res = await callApiWithRetry({
+            model, max_tokens:8000, temperature:0, system:systemPrompt,
+            messages:[{role:'user', content:
+              `Proofread this text${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}]
+          }, apiKey, ci+1, chunks.length, showOnDone);
 
-        const data = await res.json();
-        console.debug('[Proofreader] chunk', ci+1, 'raw response:', data.content[0].text.slice(0, 300));
-        const chunk_report = parseClaudeJSON(data.content[0].text);
+          const data = await res.json();
+          console.debug('[Proofreader] chunk', ci+1, 'attempt', parseAttempt+1, '— raw:', data.content[0].text.slice(0, 200));
+          const chunk_report = parseClaudeJSON(data.content[0].text);
 
-        if (!detectedLang && chunk_report.language) detectedLang = chunk_report.language;
-        if (chunk_report.word_count) totalWordCount += chunk_report.word_count;
-        if (data.usage) { totalInputTok += data.usage.input_tokens||0; totalOutputTok += data.usage.output_tokens||0; }
+          if (!detectedLang && chunk_report.language) detectedLang = chunk_report.language;
+          if (chunk_report.word_count) totalWordCount += chunk_report.word_count;
+          if (data.usage) { totalInputTok += data.usage.input_tokens||0; totalOutputTok += data.usage.output_tokens||0; }
 
-        const idOffset = allErrors.length;
-        // Filter out self-contradicting errors (Claude flagged something but explanation says no error)
-        const validErrors = (chunk_report.errors||[]).filter(e => !isFalsePositive(e));
-        validErrors.forEach((e, idx) => {
-          e.id = idOffset + idx + 1;
-          // Fallback: if Claude didn't return page, try to find it client-side
-          if (!e.page && docInfo.pageTexts.length)
-            e.page = findPage(e.original) || findPage(e.context);
-          allErrors.push(e);
-          if (summaryTotals[e.type] !== undefined) summaryTotals[e.type]++;
-        }); // end validErrors.forEach
-        completedChunks++;
+          const idOffset = allErrors.length;
+          // Filter out self-contradicting errors (Claude flagged something but explanation says no error)
+          const validErrors = (chunk_report.errors||[]).filter(e => !isFalsePositive(e));
+          validErrors.forEach((e, idx) => {
+            e.id = idOffset + idx + 1;
+            // Fallback: if Claude didn't return page, try to find it client-side
+            if (!e.page && docInfo.pageTexts.length)
+              e.page = findPage(e.original) || findPage(e.context);
+            allErrors.push(e);
+            if (summaryTotals[e.type] !== undefined) summaryTotals[e.type]++;
+          });
+          completedChunks++;
+          chunkDone = true;
 
-      } catch(chunkErr) {
-        lastChunkErr = chunkErr;
-        partialFromChunk = ci + 1;
-        const msg = chunkErr.message||'';
-        if (showOnDone) {
-          if (isRateLimitError(msg)) {
-            showApiError('Rate limit reached',
-              `Rate limit hit on chunk ${ci+1} of ${chunks.length} (30,000 tokens/min exceeded).<br><br>`+
-              (completedChunks > 0
-                ? `A partial report for chunks 1–${completedChunks} has been generated below.<br><br>`
-                : ``)+
-              `<strong>Tips:</strong><br>`+
-              `• Switch to <strong>Haiku 4.5</strong> (fastest, lowest token usage)<br>`+
-              `• Wait 1–2 minutes and retry — the system auto-retried 3 times before stopping`
-            );
-          } else {
-            // Show persistent error modal for non-rate-limit errors (e.g. JSON parse failures)
-            const isJsonErr = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse');
-            if (isJsonErr) {
-              showApiError(`Parsing error on chunk ${ci+1}`,
-                `The model returned a response that couldn't be parsed as JSON.<br><br>`+
+        } catch(chunkErr) {
+          const msg = chunkErr.message||'';
+          const isJsonErr = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse') ||
+                            msg.toLowerCase().includes('incomplete');
+          // Auto-retry parse errors silently (no modal yet)
+          if (isJsonErr && parseAttempt < 2) continue;
+
+          // Out of retries or non-retriable error — record failure and show UI
+          lastChunkErr = chunkErr;
+          partialFromChunk = ci + 1;
+          if (showOnDone) {
+            if (isRateLimitError(msg)) {
+              showApiError('Rate limit reached',
+                `Rate limit hit on chunk ${ci+1} of ${chunks.length} (30,000 tokens/min exceeded).<br><br>`+
                 (completedChunks > 0
-                  ? `A partial report for ${completedChunks} of ${chunks.length} chunks has been generated below.<br><br>`
+                  ? `A partial report for chunks 1–${completedChunks} has been generated below.<br><br>`
+                  : ``)+
+                `<strong>Tips:</strong><br>`+
+                `• Switch to <strong>Haiku 4.5</strong> (fastest, lowest token usage)<br>`+
+                `• Wait 1–2 minutes and retry — the system auto-retried 3 times before stopping`
+              );
+            } else if (isJsonErr) {
+              showApiError(`Parsing error on chunk ${ci+1}`,
+                `The model returned a response that couldn't be parsed as JSON after 3 attempts.<br><br>`+
+                (completedChunks > 0
+                  ? `A partial report for ${completedChunks} of ${chunks.length} chunks has been generated below. Use <strong>Continue</strong> to resume.<br><br>`
                   : ``)+
                 `<strong>To fix:</strong><br>`+
-                `• Switch to <strong>Sonnet 4.5</strong> (most reliable JSON output)<br>`+
-                `• Or retry — occasional format issues usually resolve on the next attempt`
+                `• Switch to <strong>Sonnet 4.6</strong> (most reliable JSON output)<br>`+
+                `• Or reduce document size — chunk may be producing too many errors for Haiku's output limit`
               );
             } else {
               toast(`Chunk ${ci+1} error: ${msg}`, 'err');
             }
           }
+          break; // exit parseAttempt loop
         }
-        break;
-      }
+      } // end parseAttempt loop
+      if (!chunkDone) break; // exit chunk (ci) loop
     }
 
     // Store retry context for the "Continue" button when partial
@@ -2197,7 +2212,7 @@ async function retryFailedChunks() {
 
       try {
         const res = await callApiWithRetry({
-          model, max_tokens:16000, temperature:0, system:systemPrompt,
+          model, max_tokens:8000, temperature:0, system:systemPrompt,
           messages:[{role:'user', content:
             `Proofread this text (part ${ci+1} of ${chunks.length}):\n\n${chunks[ci]}`}]
         }, apiKey, ci+1, chunks.length, true);
