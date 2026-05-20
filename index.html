@@ -549,6 +549,7 @@
     <div class="modal-row"><span class="lbl">Model</span><span class="val" id="cm-model"></span></div>
     <div class="modal-row" style="border-bottom:none;margin-top:4px"><span class="lbl">Estimated cost</span><span class="modal-cost" id="cm-cost"></span></div>
     <p class="modal-warn">Cost is an estimate based on document size. Actual cost shown after completion.</p>
+    <p class="modal-warn" id="cm-large-doc-tip" style="display:none;color:#f97316">⚡ Large document detected — for best results, select <strong>Haiku 4.5</strong> (fastest model, lowest token usage, least likely to hit rate limits).</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="hideConfirmModal()">Cancel</button>
       <button class="btn btn-primary btn-lg" id="cm-confirm-btn" onclick="confirmAndProofread()">Confirm &amp; Proofread</button>
@@ -584,8 +585,8 @@ const GRADE_CONFIG = [
   [60,'D','#f97316','Needs Work'], [0,'F','#ef4444','Poor'],
 ];
 const CHAR_LIMIT = 300000;
-const CHUNK_SIZE  = 60000;   // ~15k tokens/chunk — safely under 30k tokens/min rate limit
-const RATE_LIMIT_WAIT_S = 65; // seconds to pause between chunks
+const CHUNK_SIZE  = 45000;   // ~16k tokens/chunk — safely under 30k tokens/min rate limit
+const RATE_LIMIT_WAIT_S = 75; // seconds to pause between chunks (generous buffer for sliding window)
 const MODEL_PRICING = {
   'claude-sonnet-4-6':       { in: 3.00,  out: 15.00 },
   'claude-opus-4-7':         { in: 15.00, out: 75.00 },
@@ -995,6 +996,7 @@ function showConfirmModal(file, pasteText, apiKey) {
   document.getElementById('cm-words').textContent = words.toLocaleString();
   document.getElementById('cm-chunks').textContent = numChunks === 1 ? '1 (single pass)' : `${numChunks} chunks`;
   document.getElementById('cm-time').textContent = numChunks <= 1 ? 'Under 30 seconds' : fmtTime(estTimeSec);
+  document.getElementById('cm-large-doc-tip').style.display = numChunks >= 3 ? 'block' : 'none';
   document.getElementById('cm-checks').textContent = checks;
   document.getElementById('cm-model').textContent = modelNames[model] || model;
   document.getElementById('cm-cost').textContent = estCost < 0.01 ? `~$${estCost.toFixed(4)}` : `~$${estCost.toFixed(3)}`;
