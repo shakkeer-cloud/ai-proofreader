@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proofread Share · Explorer</title>
+  <style>
+    :root {
+      --bg:      #0f1117;
+      --surface: #1a1d27;
+      --sf2:     #22263a;
+      --border:  #2a2d3a;
+      --text:    #e1e4f0;
+      --muted:   #8b8fa8;
+      --primary: #6c63ff;
+      --ph:      #5b52ee;
+      --success: #10b981;
+      --danger:  #ef4444;
+      --warning: #f59e0b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
+
+    /* ── Layout ── */
+    .page { display: none; max-width: 960px; margin: 0 auto; padding: 24px 16px 80px; }
+    .page.active { display: block; }
+
+    /* ── Header ── */
+    .app-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; align-items: center; gap: 12px; height: 52px; position: sticky; top: 0; z-index: 50; }
+    .app-logo { font-size: 15px; font-weight: 700; color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .header-tabs { display: flex; gap: 2px; margin-left: auto; }
+    .header-tab { background: none; border: none; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all .15s; }
+    .header-tab.active, .header-tab:hover { background: var(--sf2); color: var(--text); }
+    .header-tab.active { color: var(--primary); }
+
+    /* ── Cards ── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+    .help { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+    /* ── Inputs ── */
+    input[type=text], input[type=password], input[type=email] {
+      width: 100%; background: var(--sf2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 13px; padding: 9px 12px; outline: none; transition: border-color .15s;
+    }
+    input:focus { border-color: var(--primary); }
+    label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 5px; }
+
+    /* ── Buttons ── */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; text-decoration: none; white-space: nowrap; }
+    .btn-primary  { background: var(--primary); color: #fff; }
+    .btn-primary:hover  { background: var(--ph); }
+    .btn-secondary { background: var(--sf2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-success  { background: #10b98122; color: var(--success); border: 1px solid #10b98140; }
+    .btn-success:hover  { background: #10b98133; }
+    .btn-danger   { background: #ef444422; color: var(--danger);  border: 1px solid #ef444440; }
+    .btn-danger:hover   { background: #ef444433; }
+    .btn-warn     { background: #f59e0b22; color: var(--warning); border: 1px solid #f59e0b40; }
+    .btn-warn:hover     { background: #f59e0b33; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    #toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 999; max-width: 320px; }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.ok   { background: #10b981; color: #fff; }
+    #toast.warn { background: #f59e0b; color: #000; }
+    #toast.err  { background: #ef4444; color: #fff; }
+
+    /* ── Loading overlay ── */
+    #loading-overlay { display: none; position: fixed; inset: 0; background: rgba(15,17,23,.85); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+    #loading-overlay.show { display: flex; }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-msg { font-size: 14px; font-weight: 600; color: var(--muted); }
+
+    /* ── Banners ── */
+    .banner-warn    { background: #f59e0b18; border: 1px solid #f59e0b40; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+    .banner-info    { background: #6c63ff18; border: 1px solid #6c63ff40; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+    .banner-success { background: #10b98118; border: 1px solid #10b98140; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+
+    /* ── Report preview card ── */
+    .report-preview { background: var(--sf2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .report-preview-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+    .rp-field { }
+    .rp-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .rp-value { font-size: 13px; font-weight: 600; margin-top: 2px; }
+
+    /* ── Link box ── */
+    .link-box { background: var(--sf2); border: 1px solid var(--primary); border-radius: 8px; padding: 10px 44px 10px 12px; font-size: 12px; font-family: monospace; word-break: break-all; color: var(--primary); margin-top: 10px; cursor: pointer; position: relative; }
+    .link-box::after { content: '📋 Copy'; position: absolute; top: 50%; right: 10px; transform: translateY(-50%); font-size: 11px; color: var(--muted); font-family: inherit; }
+    .link-box:hover { border-color: var(--ph); }
+
+    /* ── Session list ── */
+    .session-item { background: var(--sf2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+    .session-item-info { flex: 1; min-width: 0; }
+    .session-item-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .session-item-meta  { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .session-item-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+    .empty-state { text-align: center; padding: 28px; color: var(--muted); font-size: 13px; }
+
+    /* ── Status badge ── */
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+    .badge-pending  { background: #f59e0b22; color: var(--warning); border: 1px solid #f59e0b40; }
+    .badge-reviewed { background: #10b98122; color: var(--success); border: 1px solid #10b98140; }
+
+    /* ── Review header ── */
+    .review-header { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; }
+    .review-header h2 { font-size: 17px; font-weight: 700; }
+    .review-header .meta { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.7; }
+    .review-header .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .chip { background: var(--sf2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600; }
+    .chip span { color: var(--muted); font-weight: 400; }
+
+    /* ── Progress bar ── */
+    .progress-row { display: flex; align-items: center; gap: 12px; background: var(--sf2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+    .progress-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .progress-fill  { height: 100%; background: var(--primary); border-radius: 3px; transition: width .3s; }
+    .progress-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+    /* ── Filter bar ── */
+    .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+    .filter-bar .filter-label { font-size: 11px; color: var(--muted); }
+    .filt-btn { background: var(--sf2); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; padding: 4px 10px; cursor: pointer; transition: all .15s; }
+    .filt-btn.on { color: #fff; border-color: transparent; }
+    .filt-btn.f-all.on       { background: var(--primary); }
+    .filt-btn.f-approved.on  { background: var(--success); }
+    .filt-btn.f-rejected.on  { background: var(--danger); }
+    .filt-btn.f-suggested.on { background: var(--warning); color: #000; }
+    .filt-btn.f-pending.on   { background: var(--muted); }
+
+    /* ── Review table ── */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+    thead th { background: var(--sf2); color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr.hidden-row { display: none; }
+    tbody tr.row-approved  { background: #10b98108; }
+    tbody tr.row-rejected  { background: #ef444408; }
+    tbody tr.row-suggested { background: #f59e0b08; }
+    td { padding: 8px 10px; vertical-align: top; }
+
+    col.c-num  { width: 32px; }
+    col.c-type { width: 90px; }
+    col.c-pg   { width: 36px; }
+    col.c-orig { width: 17%; }
+    col.c-corr { width: 17%; }
+    col.c-expl { width: auto; }
+    col.c-dec  { width: 165px; }
+
+    .type-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; display: inline-block; white-space: nowrap; }
+    .sev-badge  { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px; margin-top: 3px; display: inline-block; }
+    .sev-Critical { background: #ef444422; color: var(--danger); }
+    .sev-Moderate { background: #f59e0b22; color: var(--warning); }
+    .sev-Minor    { background: #8b8fa822; color: var(--muted); }
+
+    .pg-num   { font-size: 11px; color: var(--muted); }
+    .orig-txt { color: #fca5a5; font-size: 12px; line-height: 1.5; word-break: break-word; }
+    .corr-txt { color: #6ee7b7; font-size: 12px; line-height: 1.5; word-break: break-word; }
+    .expl-txt { font-size: 12px; color: var(--muted); line-height: 1.5; word-break: break-word; }
+
+    /* Decision buttons */
+    .dec-cell { display: flex; flex-direction: column; gap: 5px; }
+    .dec-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+    .dec-btn  { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px; cursor: pointer; border: 1px solid; transition: all .15s; background: none; }
+    .dec-btn.approve { color: var(--success); border-color: #10b98140; }
+    .dec-btn.approve.sel { background: var(--success); color: #fff; border-color: var(--success); }
+    .dec-btn.reject  { color: var(--danger);  border-color: #ef444440; }
+    .dec-btn.reject.sel  { background: var(--danger);  color: #fff; border-color: var(--danger); }
+    .dec-btn.suggest { color: var(--warning); border-color: #f59e0b40; }
+    .dec-btn.suggest.sel { background: var(--warning); color: #000; border-color: var(--warning); }
+    .suggest-input { width: 100%; font-size: 11px; padding: 4px 7px; border-radius: 5px; background: var(--sf2); border: 1px solid var(--border); color: var(--text); resize: none; display: none; }
+    .suggest-input.show { display: block; }
+
+    /* Decision labels (results mode) */
+    .dec-label { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; display: inline-block; }
+    .lbl-approved  { background: #10b98122; color: var(--success); }
+    .lbl-rejected  { background: #ef444422; color: var(--danger); }
+    .lbl-suggested { background: #f59e0b22; color: var(--warning); }
+    .lbl-pending   { background: var(--sf2); color: var(--muted); border: 1px solid var(--border); }
+    .sug-text { font-size: 11px; color: var(--warning); margin-top: 4px; font-style: italic; word-break: break-word; }
+
+    /* ── Reviewer name bar ── */
+    .reviewer-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .reviewer-bar label { margin: 0; white-space: nowrap; }
+    .reviewer-bar input { max-width: 220px; flex: 1; }
+
+    /* ── Sticky bottom bar ── */
+    .bottom-bar { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; z-index: 40; }
+    .bottom-bar .summary { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+
+    /* ── Results stats ── */
+    .results-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; flex: 1; min-width: 110px; text-align: center; }
+    .stat-box .num { font-size: 22px; font-weight: 800; }
+    .stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .stat-approved  .num { color: var(--success); }
+    .stat-rejected  .num { color: var(--danger); }
+    .stat-suggested .num { color: var(--warning); }
+    .stat-pending   .num { color: var(--muted); }
+
+    /* ── SQL block ── */
+    .sql-block { background: #0a0c14; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-family: monospace; font-size: 11px; color: #a5b4fc; line-height: 1.7; white-space: pre-wrap; word-break: break-all; margin-top: 8px; overflow-x: auto; }
+    .sep { height: 1px; background: var(--border); margin: 16px 0; }
+
+    /* ── Footer ── */
+    .app-footer { text-align: center; font-size: 11px; color: var(--muted); padding: 20px; opacity: .5; }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay"><div class="spinner"></div><div id="loading-msg">Loading…</div></div>
+<div id="toast"></div>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header class="app-header">
+  <a class="app-logo" href="index.html">📝 <span style="color:var(--muted);font-weight:400">Proofreader</span> <span style="color:var(--border)">›</span> Share</a>
+  <div class="header-tabs" id="header-tabs">
+    <button class="header-tab active" onclick="showPage('dash')" id="tab-dash">Dashboard</button>
+    <button class="header-tab" onclick="showPage('setup')" id="tab-setup">Setup</button>
+  </div>
+</header>
+
+<!-- ═══════════════ DASHBOARD ═══════════════ -->
+<div class="page active" id="dash-page">
+
+  <!-- Setup needed banner -->
+  <div class="banner-warn" id="setup-banner" style="display:none">
+    ⚙️ <strong>Supabase not configured.</strong>
+    Go to <strong>Setup</strong> to enter your credentials before sharing reviews.
+    <button class="btn btn-warn btn-sm" style="margin-left:8px" onclick="showPage('setup')">Open Setup →</button>
+  </div>
+
+  <!-- Latest report card -->
+  <div class="card">
+    <h3>📄 Latest Proofreading Report</h3>
+    <p class="help">Automatically loaded from your last proofreading session in the main app.</p>
+    <div id="report-preview-area" style="margin-top:14px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="share-btn" onclick="createSession()" disabled>
+        🔗 Create Review Link
+      </button>
+      <span class="help" id="share-btn-hint"></span>
+    </div>
+    <div id="created-link-wrap" style="display:none;margin-top:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--success);margin-bottom:6px">✓ Review session created! Share this link:</div>
+      <div class="link-box" id="new-link" onclick="copyText(this.dataset.url)"></div>
+      <div class="help" style="margin-top:6px">Link expires in 30 days · Anyone with the link can review</div>
+    </div>
+  </div>
+
+  <!-- My sessions -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="margin:0">📋 My Review Sessions</h3>
+      <button class="btn btn-secondary btn-sm" onclick="refreshSessions()">↻ Refresh</button>
+    </div>
+    <div id="sessions-list"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════ REVIEW / RESULTS (loaded via ?r=ID) ═══════════════ -->
+<div class="page" id="review-page">
+
+  <div id="rv-header"></div>
+
+  <!-- Reviewer name (review mode only) -->
+  <div class="reviewer-bar" id="rv-name-bar">
+    <label>Your name:</label>
+    <input type="text" id="rv-name" placeholder="Enter your name before submitting…">
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-row" id="rv-progress">
+    <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="progress-label" id="prog-label">0 / 0 reviewed</div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <span class="filter-label">FILTER:</span>
+    <button class="filt-btn f-all on"      onclick="applyFilter('all',this)">All</button>
+    <button class="filt-btn f-approved"    onclick="applyFilter('approved',this)">✓ Approved</button>
+    <button class="filt-btn f-rejected"    onclick="applyFilter('rejected',this)">✗ Rejected</button>
+    <button class="filt-btn f-suggested"   onclick="applyFilter('suggested',this)">✎ Suggested</button>
+    <button class="filt-btn f-pending"     onclick="applyFilter('pending',this)">Undecided</button>
+  </div>
+
+  <!-- Results stats (results mode only) -->
+  <div class="results-stats" id="results-stats" style="display:none"></div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <colgroup>
+        <col class="c-num"><col class="c-type"><col class="c-pg">
+        <col class="c-orig"><col class="c-corr"><col class="c-expl"><col class="c-dec">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>#</th><th>Type</th><th>Pg</th>
+          <th>Original</th><th>Corrected</th><th>Explanation</th>
+          <th id="dec-th">Your Decision</th>
+        </tr>
+      </thead>
+      <tbody id="rv-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Submit bar (review mode) -->
+  <div class="bottom-bar" id="submit-bar">
+    <div class="summary" id="submit-summary">Make decisions above, then submit.</div>
+    <button class="btn btn-primary" id="submit-btn" onclick="submitReview()" disabled>Submit Review</button>
+  </div>
+
+  <!-- Results bar (results mode) -->
+  <div class="bottom-bar" id="results-bar" style="display:none">
+    <div class="summary" id="results-summary"></div>
+    <button class="btn btn-success" onclick="exportApproved()">⬇ Approved Changes</button>
+    <button class="btn btn-secondary" onclick="exportFullJSON()">⬇ Full JSON</button>
+  </div>
+
+</div>
+
+<!-- ═══════════════ SETUP ═══════════════ -->
+<div class="page" id="setup-page">
+  <div class="card">
+    <h3>⚙️ Supabase Configuration</h3>
+    <p class="help">One-time setup. Create a free project at <a href="https://supabase.com" target="_blank" style="color:var(--primary)">supabase.com</a>, run the SQL below, then paste your credentials.</p>
+
+    <div style="margin-top:16px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">Step 1 — Run this SQL in your Supabase SQL Editor</div>
+      <div class="sql-block" id="setup-sql">create table public.review_sessions (
+  id text primary key,
+  report jsonb not null,
+  doc_name text,
+  initiated_by text,
+  model_name text,
+  created_at timestamptz default now(),
+  expires_at timestamptz default (now() + interval '30 days'),
+  status text default 'pending',
+  reviewed_by text,
+  reviewed_at timestamptz,
+  decisions jsonb default '{}'::jsonb
+);
+alter table public.review_sessions enable row level security;
+create policy "anon_read"   on public.review_sessions for select using (true);
+create policy "anon_insert" on public.review_sessions for insert with check (true);
+create policy "anon_update" on public.review_sessions for update using (status = 'pending') with check (true);</div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="copySQL()">📋 Copy SQL</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">Step 2 — Paste your credentials</div>
+    <p class="help">In Supabase → <strong>Settings → API</strong>. Copy <strong>Project URL</strong> and <strong>anon public</strong> key.</p>
+
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+      <div>
+        <label>Supabase Project URL</label>
+        <input type="text" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off">
+      </div>
+      <div>
+        <label>Supabase Anon Key (public)</label>
+        <input type="password" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" autocomplete="off">
+      </div>
+      <div>
+        <label>Your Name (shown to reviewer)</label>
+        <input type="text" id="sb-name" placeholder="e.g. Shakkeer" autocomplete="off">
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveSetup()">Save Configuration</button>
+      <button class="btn btn-secondary" onclick="testConn()">Test Connection</button>
+    </div>
+  </div>
+</div>
+
+<footer class="app-footer">© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</footer>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════
+// ★  CREDENTIALS — fill in after Supabase setup
+//    (anon key is public-safe to embed here)
+// ═══════════════════════════════════════════
+const SB_URL_DEFAULT = 'YOUR_SUPABASE_URL';
+const SB_KEY_DEFAULT = 'YOUR_ANON_KEY';
+
+// ═══════════════════════════════════════════
+// Type colours (matches main proofreader)
+// ═══════════════════════════════════════════
+const TYPE_COLORS = {
+  Typos:'#ef4444', Spelling:'#f97316', Grammar:'#f59e0b',
+  Punctuation:'#10b981', Capitalization:'#3b82f6',
+  Style:'#8b5cf6', Consistency:'#06b6d4', Clarity:'#ec4899'
+};
+
+// ═══════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════
+let _sbUrl  = '';
+let _sbKey  = '';
+let _myName = '';
+let _report      = null;  // last proofread report (from localStorage)
+let _session     = null;  // session object from Supabase
+let _sessionId   = null;
+let _decisions   = {};    // { errorId: { decision, suggestion } }
+let _filter      = 'all';
+let _isResults   = false;
+
+// ═══════════════════════════════════════════
+// Supabase REST helpers
+// ═══════════════════════════════════════════
+function _sbHeaders() {
+  return {
+    'apikey': _sbKey,
+    'Authorization': `Bearer ${_sbKey}`,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function sbInsert(row) {
+  const r = await fetch(`${_sbUrl}/rest/v1/review_sessions`, {
+    method: 'POST',
+    headers: { ..._sbHeaders(), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!r.ok) throw new Error(`Insert failed: ${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+async function sbGet(id) {
+  const r = await fetch(
+    `${_sbUrl}/rest/v1/review_sessions?id=eq.${encodeURIComponent(id)}&select=*`,
+    { headers: _sbHeaders() }
+  );
+  if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
+  const rows = await r.json();
+  return rows[0] || null;
+}
+
+async function sbPatch(id, data) {
+  const r = await fetch(
+    `${_sbUrl}/rest/v1/review_sessions?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: { ..._sbHeaders(), 'Prefer': 'return=representation' },
+      body: JSON.stringify(data)
+    }
+  );
+  if (!r.ok) throw new Error(`Update failed: ${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+async function sbListMine(ids) {
+  if (!ids.length) return [];
+  const filter = ids.map(id => `id.eq.${encodeURIComponent(id)}`).join(',');
+  const r = await fetch(
+    `${_sbUrl}/rest/v1/review_sessions?or=(${filter})&select=id,doc_name,initiated_by,created_at,status,reviewed_by`,
+    { headers: _sbHeaders() }
+  );
+  if (!r.ok) return [];
+  return r.json();
+}
+
+// ═══════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function setLoading(on, msg = 'Loading…') {
+  document.getElementById('loading-overlay').classList.toggle('show', on);
+  document.getElementById('loading-msg').textContent = msg;
+}
+
+function showPage(name) {
+  ['dash', 'review', 'setup'].forEach(p => {
+    document.getElementById(p + '-page').classList.toggle('active', p === name);
+  });
+  document.querySelectorAll('.header-tab').forEach(b => b.classList.remove('active'));
+  const t = document.getElementById('tab-' + name);
+  if (t) t.classList.add('active');
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text)
+    .then(() => toast('Copied!'))
+    .catch(() => {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast('Copied!');
+    });
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function dlBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// ═══════════════════════════════════════════
+// Credentials / Config
+// ═══════════════════════════════════════════
+function loadConfig() {
+  _sbUrl  = localStorage.getItem('review_sb_url')  || SB_URL_DEFAULT;
+  _sbKey  = localStorage.getItem('review_sb_key')  || SB_KEY_DEFAULT;
+  _myName = localStorage.getItem('review_sb_name') || '';
+}
+
+function isConfigured() {
+  return _sbUrl && _sbKey && _sbUrl !== 'YOUR_SUPABASE_URL' && _sbKey !== 'YOUR_ANON_KEY';
+}
+
+function saveSetup() {
+  const url  = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
+  const key  = document.getElementById('sb-key').value.trim();
+  const name = document.getElementById('sb-name').value.trim();
+  if (!url || !key) { toast('Enter both URL and key.', 'warn'); return; }
+  localStorage.setItem('review_sb_url',  url);
+  localStorage.setItem('review_sb_key',  key);
+  localStorage.setItem('review_sb_name', name);
+  _sbUrl  = url;
+  _sbKey  = key;
+  _myName = name;
+  toast('Configuration saved!');
+  showPage('dash');
+  checkConfig();
+}
+
+async function testConn() {
+  const url = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('Enter URL and key first.', 'warn'); return; }
+  setLoading(true, 'Testing connection…');
+  try {
+    const r = await fetch(`${url}/rest/v1/review_sessions?limit=1`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    });
+    if (r.status === 200 || r.status === 206) {
+      toast('✓ Connection successful!');
+    } else if (r.status === 404) {
+      toast('Table not found — run the SQL first.', 'warn');
+    } else {
+      toast(`Error ${r.status} — check your URL and key.`, 'err');
+    }
+  } catch(e) {
+    toast('Connection failed: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function copySQL() {
+  copyText(document.getElementById('setup-sql').textContent);
+}
+
+function checkConfig() {
+  const banner = document.getElementById('setup-banner');
+  if (banner) banner.style.display = isConfigured() ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════
+// Dashboard — load last report from localStorage
+// ═══════════════════════════════════════════
+function loadLastReport() {
+  const area  = document.getElementById('report-preview-area');
+  const btn   = document.getElementById('share-btn');
+  const hint  = document.getElementById('share-btn-hint');
+
+  try {
+    const raw = localStorage.getItem('proof_last_report');
+    if (!raw) {
+      area.innerHTML = `<div class="empty-state">
+        No report found.<br><br>
+        Go to the <a href="index.html" style="color:var(--primary)">main proofreader</a>,
+        proofread a document, then come back here to share it.
+      </div>`;
+      hint.textContent = 'Proofread a document first.';
+      return;
+    }
+
+    const data = JSON.parse(raw);
+    const report = data.report || data; // handle both {report, retryInfo} and raw report
+    _report = report;
+
+    const docName  = report._doc_name  || 'Untitled';
+    const initBy   = report._initiated_by || _myName || '—';
+    const errCount = (report.errors || []).length;
+    const lang     = report.language || '—';
+    const model    = report._model ? report._model.replace('claude-', 'Claude ') : '—';
+
+    area.innerHTML = `
+      <div class="report-preview">
+        <div class="report-preview-meta">
+          <div class="rp-field">
+            <div class="rp-label">Document</div>
+            <div class="rp-value">${esc(docName)}</div>
+          </div>
+          <div class="rp-field">
+            <div class="rp-label">Issues Found</div>
+            <div class="rp-value" style="color:var(--warning)">${errCount}</div>
+          </div>
+          <div class="rp-field">
+            <div class="rp-label">Language</div>
+            <div class="rp-value">${esc(lang)}</div>
+          </div>
+          <div class="rp-field">
+            <div class="rp-label">Model</div>
+            <div class="rp-value">${esc(model)}</div>
+          </div>
+          <div class="rp-field">
+            <div class="rp-label">Initiated By</div>
+            <div class="rp-value">${esc(initBy)}</div>
+          </div>
+        </div>
+      </div>`;
+
+    btn.disabled = false;
+    hint.textContent = 'Creates a shareable link instantly — no download needed.';
+
+  } catch(e) {
+    area.innerHTML = `<div class="empty-state" style="color:var(--danger)">Could not read last report. Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════
+// Create session
+// ═══════════════════════════════════════════
+async function createSession() {
+  if (!isConfigured()) {
+    toast('Configure Supabase in Setup tab first.', 'warn');
+    showPage('setup');
+    return;
+  }
+  if (!_report) { toast('No report loaded.', 'warn'); return; }
+
+  setLoading(true, 'Creating review link…');
+  try {
+    const id = genId();
+    const docName    = _report._doc_name  || 'Untitled';
+    const initiatedBy = _report._initiated_by || _myName || '';
+    const modelName   = _report._model || '';
+
+    await sbInsert({
+      id,
+      report:       _report,
+      doc_name:     docName,
+      initiated_by: initiatedBy || _myName || '',
+      model_name:   modelName,
+      expires_at:   new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+    });
+
+    const link = `${location.origin}${location.pathname}?r=${id}`;
+    const box  = document.getElementById('new-link');
+    box.textContent  = link;
+    box.dataset.url  = link;
+    document.getElementById('created-link-wrap').style.display = 'block';
+
+    saveSessionLocal(id, docName, initiatedBy, new Date().toISOString());
+    renderSessions();
+    toast('Review link created! 🎉');
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ═══════════════════════════════════════════
+// Local session list
+// ═══════════════════════════════════════════
+function saveSessionLocal(id, docName, initiatedBy, createdAt) {
+  try {
+    const list = JSON.parse(localStorage.getItem('sr_sessions') || '[]');
+    if (!list.find(s => s.id === id)) {
+      list.unshift({ id, docName, initiatedBy, createdAt, status: 'pending' });
+      localStorage.setItem('sr_sessions', JSON.stringify(list.slice(0, 100)));
+    }
+  } catch(e) {}
+}
+
+function getSessionsLocal() {
+  try { return JSON.parse(localStorage.getItem('sr_sessions') || '[]'); }
+  catch(e) { return []; }
+}
+
+async function refreshSessions() {
+  if (!isConfigured()) { renderSessions(); return; }
+  const list = getSessionsLocal();
+  if (!list.length) { renderSessions(); return; }
+  setLoading(true, 'Refreshing…');
+  try {
+    const remote = await sbListMine(list.map(s => s.id));
+    remote.forEach(r => {
+      const local = list.find(s => s.id === r.id);
+      if (local) {
+        local.status     = r.status;
+        local.reviewedBy = r.reviewed_by;
+        local.docName    = r.doc_name || local.docName;
+      }
+    });
+    localStorage.setItem('sr_sessions', JSON.stringify(list));
+    renderSessions();
+    toast('Refreshed!');
+  } catch(e) {
+    toast('Refresh error: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderSessions() {
+  const list = getSessionsLocal();
+  const el   = document.getElementById('sessions-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state">No sessions yet.<br>Create a review link above to get started.</div>';
+    return;
+  }
+  el.innerHTML = list.map(s => {
+    const isReviewed = s.status === 'reviewed';
+    const link = `${location.origin}${location.pathname}?r=${s.id}`;
+    return `
+    <div class="session-item">
+      <div class="session-item-info">
+        <div class="session-item-title">${esc(s.docName || 'Untitled')}</div>
+        <div class="session-item-meta">
+          ${s.initiatedBy ? esc(s.initiatedBy) + ' · ' : ''}${fmtDate(s.createdAt)}
+          ${isReviewed && s.reviewedBy ? ' · Reviewed by ' + esc(s.reviewedBy) : ''}
+        </div>
+      </div>
+      <div class="session-item-actions">
+        <span class="badge ${isReviewed ? 'badge-reviewed' : 'badge-pending'}">
+          ${isReviewed ? '✓ Reviewed' : 'Pending'}
+        </span>
+        <button class="btn btn-secondary btn-sm" onclick="window.location.href='?r=${s.id}'">
+          ${isReviewed ? '👁 Results' : '🔗 Open'}
+        </button>
+        <button class="btn btn-secondary btn-sm" title="Copy link" onclick="copyText('${esc(link)}')">📋</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// Load review session (?r=ID)
+// ═══════════════════════════════════════════
+async function loadReviewSession(id) {
+  setLoading(true, 'Loading session…');
+  try {
+    // If we have no credentials at all, show the one-time reviewer setup prompt
+    if (!isConfigured()) {
+      setLoading(false);
+      showReviewerKeyPrompt(id);
+      return;
+    }
+    const row = await sbGet(id);
+    if (!row) {
+      document.getElementById('review-page').innerHTML =
+        `<div class="card" style="margin-top:24px;text-align:center">
+           <p style="font-size:15px;font-weight:700;margin-bottom:8px">Session not found</p>
+           <p class="help">This session may have expired or the link is incorrect.</p>
+           <a href="${location.pathname}" class="btn btn-primary" style="margin-top:14px;display:inline-flex">← Back to Dashboard</a>
+         </div>`;
+      document.getElementById('review-page').classList.add('active');
+      document.getElementById('header-tabs').style.display = 'none';
+      return;
+    }
+
+    _session   = row;
+    _sessionId = id;
+    _isResults = row.status === 'reviewed';
+    _decisions = _isResults
+      ? (typeof row.decisions === 'string' ? JSON.parse(row.decisions) : row.decisions || {})
+      : {};
+
+    renderReviewPage();
+  } catch(e) {
+    toast('Error loading session: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// Reviewer on a fresh browser: ask for the Supabase key once
+function showReviewerKeyPrompt(sessionId) {
+  document.getElementById('header-tabs').style.display = 'none';
+  document.getElementById('review-page').innerHTML = `
+    <div class="card" style="max-width:460px;margin:32px auto">
+      <h3>🔑 Enter access key to view this review</h3>
+      <p class="help" style="margin:10px 0 16px">The person who sent you this link will provide the Supabase URL and key. This is saved locally and only needed once.</p>
+      <label>Supabase Project URL</label>
+      <input type="text" id="rv-sb-url" placeholder="https://xxxx.supabase.co" style="margin-bottom:10px">
+      <label>Supabase Anon Key</label>
+      <input type="password" id="rv-sb-key" placeholder="eyJ…" style="margin-bottom:14px">
+      <button class="btn btn-primary" onclick="saveReviewerKey('${sessionId}')">Load Review →</button>
+    </div>`;
+  document.getElementById('review-page').classList.add('active');
+}
+
+async function saveReviewerKey(sessionId) {
+  const url = document.getElementById('rv-sb-url')?.value.trim().replace(/\/$/, '');
+  const key = document.getElementById('rv-sb-key')?.value.trim();
+  if (!url || !key) { toast('Enter both fields.', 'warn'); return; }
+  localStorage.setItem('review_sb_url', url);
+  localStorage.setItem('review_sb_key', key);
+  _sbUrl = url; _sbKey = key;
+  // Re-build the review page structure then load
+  document.getElementById('review-page').innerHTML = _reviewPageHTML();
+  await loadReviewSession(sessionId);
+}
+
+function _reviewPageHTML() {
+  return `
+    <div id="rv-header"></div>
+    <div class="reviewer-bar" id="rv-name-bar">
+      <label>Your name:</label>
+      <input type="text" id="rv-name" placeholder="Enter your name before submitting…">
+    </div>
+    <div class="progress-row" id="rv-progress">
+      <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">0 / 0 reviewed</div>
+    </div>
+    <div class="filter-bar">
+      <span class="filter-label">FILTER:</span>
+      <button class="filt-btn f-all on"    onclick="applyFilter('all',this)">All</button>
+      <button class="filt-btn f-approved"  onclick="applyFilter('approved',this)">✓ Approved</button>
+      <button class="filt-btn f-rejected"  onclick="applyFilter('rejected',this)">✗ Rejected</button>
+      <button class="filt-btn f-suggested" onclick="applyFilter('suggested',this)">✎ Suggested</button>
+      <button class="filt-btn f-pending"   onclick="applyFilter('pending',this)">Undecided</button>
+    </div>
+    <div class="results-stats" id="results-stats" style="display:none"></div>
+    <div class="table-wrap">
+      <table>
+        <colgroup>
+          <col class="c-num"><col class="c-type"><col class="c-pg">
+          <col class="c-orig"><col class="c-corr"><col class="c-expl"><col class="c-dec">
+        </colgroup>
+        <thead>
+          <tr><th>#</th><th>Type</th><th>Pg</th><th>Original</th><th>Corrected</th><th>Explanation</th><th id="dec-th">Your Decision</th></tr>
+        </thead>
+        <tbody id="rv-tbody"></tbody>
+      </table>
+    </div>
+    <div class="bottom-bar" id="submit-bar">
+      <div class="summary" id="submit-summary">Make decisions above, then submit.</div>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitReview()" disabled>Submit Review</button>
+    </div>
+    <div class="bottom-bar" id="results-bar" style="display:none">
+      <div class="summary" id="results-summary"></div>
+      <button class="btn btn-success" onclick="exportApproved()">⬇ Approved Changes</button>
+      <button class="btn btn-secondary" onclick="exportFullJSON()">⬇ Full JSON</button>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════
+// Render review / results page
+// ═══════════════════════════════════════════
+function renderReviewPage() {
+  const s = _session;
+  const report = s.report || {};
+  const errors = report.errors || [];
+
+  // Header
+  const hdr = document.getElementById('rv-header');
+  if (hdr) {
+    const typeSummary = Object.entries(report.summary || {})
+      .filter(([k,v]) => k !== 'total_errors' && v > 0)
+      .map(([k,v]) => `<div class="chip" style="color:${TYPE_COLORS[k]||'inherit'}">${v} <span>${k}</span></div>`)
+      .join('');
+
+    hdr.innerHTML = `
+      <div class="review-header">
+        <h2>📋 ${esc(s.doc_name || 'Proofreading Review')}</h2>
+        <div class="meta">
+          ${s.initiated_by ? `Shared by <strong>${esc(s.initiated_by)}</strong> · ` : ''}
+          ${fmtDate(s.created_at)}
+          ${s.model_name ? ` · ${esc(s.model_name.replace('claude-','Claude '))}` : ''}
+          ${report.language ? ` · ${esc(report.language)}` : ''}
+          ${_isResults
+            ? ` · <span style="color:var(--success)">✓ Reviewed by <strong>${esc(s.reviewed_by)}</strong> — ${fmtDate(s.reviewed_at)}</span>`
+            : ''}
+        </div>
+        <div class="chips">
+          <div class="chip">${errors.length} <span>issues</span></div>
+          ${typeSummary}
+        </div>
+      </div>`;
+  }
+
+  // Results mode stats
+  if (_isResults) {
+    const approved  = Object.values(_decisions).filter(d => d.decision === 'approved').length;
+    const rejected  = Object.values(_decisions).filter(d => d.decision === 'rejected').length;
+    const suggested = Object.values(_decisions).filter(d => d.decision === 'suggested').length;
+    const pending   = errors.length - approved - rejected - suggested;
+    const rsEl = document.getElementById('results-stats');
+    if (rsEl) {
+      rsEl.style.display = 'flex';
+      rsEl.innerHTML = `
+        <div class="stat-box stat-approved"><div class="num">${approved}</div><div class="lbl">Approved</div></div>
+        <div class="stat-box stat-rejected"><div class="num">${rejected}</div><div class="lbl">Rejected</div></div>
+        <div class="stat-box stat-suggested"><div class="num">${suggested}</div><div class="lbl">Suggested</div></div>
+        <div class="stat-box stat-pending"><div class="num">${pending}</div><div class="lbl">No Decision</div></div>`;
+    }
+    const rsBar = document.getElementById('results-bar');
+    const rsSummary = document.getElementById('results-summary');
+    if (rsBar) rsBar.style.display = 'flex';
+    if (rsSummary) rsSummary.innerHTML =
+      `<strong style="color:var(--success)">${approved} approved</strong> · ` +
+      `<strong style="color:var(--danger)">${rejected} rejected</strong> · ` +
+      `<strong style="color:var(--warning)">${suggested} suggestions</strong>` +
+      (pending > 0 ? ` · ${pending} no decision` : '');
+  }
+
+  // Hide/show UI elements
+  const nameBar   = document.getElementById('rv-name-bar');
+  const submitBar = document.getElementById('submit-bar');
+  const progress  = document.getElementById('rv-progress');
+  const decTh     = document.getElementById('dec-th');
+  if (nameBar)  nameBar.style.display  = _isResults ? 'none' : 'flex';
+  if (submitBar) submitBar.style.display = _isResults ? 'none' : 'flex';
+  if (decTh) decTh.textContent = _isResults ? 'Decision' : 'Your Decision';
+
+  // Build rows
+  const tbody = document.getElementById('rv-tbody');
+  if (tbody) tbody.innerHTML = errors.map(e => buildRow(e)).join('');
+
+  updateProgress();
+  showPage('review');
+  document.getElementById('header-tabs').style.display = 'none';
+}
+
+function buildRow(e) {
+  const color = TYPE_COLORS[e.type] || '#8b8fa8';
+  const dec   = _decisions[String(e.id)];
+  const rowClass = dec ? `row-${dec.decision}` : '';
+
+  const typeCell = `
+    <div class="type-badge" style="background:${color}22;color:${color}">${esc(e.type)}</div>
+    <div class="sev-badge sev-${e.severity || 'Minor'}">${e.severity || 'Minor'}</div>`;
+
+  if (_isResults) {
+    let decHtml = '<span class="dec-label lbl-pending">No decision</span>';
+    if (dec) {
+      if (dec.decision === 'approved')
+        decHtml = '<span class="dec-label lbl-approved">✓ Approved</span>';
+      if (dec.decision === 'rejected')
+        decHtml = '<span class="dec-label lbl-rejected">✗ Rejected</span>';
+      if (dec.decision === 'suggested')
+        decHtml = `<span class="dec-label lbl-suggested">✎ Suggestion</span>
+                   <div class="sug-text">${esc(dec.suggestion || '')}</div>`;
+    }
+    return `<tr class="${rowClass}" data-id="${e.id}" data-dec="${dec?.decision || 'pending'}">
+      <td style="color:var(--muted);font-size:11px">${e.id}</td>
+      <td>${typeCell}</td>
+      <td class="pg-num">${e.page ? 'p.' + e.page : '—'}</td>
+      <td class="orig-txt">${esc(e.original)}</td>
+      <td class="corr-txt">${esc(e.corrected)}</td>
+      <td class="expl-txt">${esc(e.explanation)}</td>
+      <td>${decHtml}</td>
+    </tr>`;
+  }
+
+  // Interactive review mode
+  const sel     = dec?.decision || null;
+  const sugVal  = dec?.suggestion || '';
+  return `<tr class="${rowClass}" data-id="${e.id}" data-dec="${sel || 'pending'}">
+    <td style="color:var(--muted);font-size:11px">${e.id}</td>
+    <td>${typeCell}</td>
+    <td class="pg-num">${e.page ? 'p.' + e.page : '—'}</td>
+    <td class="orig-txt">${esc(e.original)}</td>
+    <td class="corr-txt">${esc(e.corrected)}</td>
+    <td class="expl-txt">${esc(e.explanation)}</td>
+    <td>
+      <div class="dec-cell">
+        <div class="dec-btns">
+          <button class="dec-btn approve ${sel==='approved'?'sel':''}"
+            onclick="setDecision(${e.id},'approved',this)">✓ Approve</button>
+          <button class="dec-btn reject ${sel==='rejected'?'sel':''}"
+            onclick="setDecision(${e.id},'rejected',this)">✗ Reject</button>
+          <button class="dec-btn suggest ${sel==='suggested'?'sel':''}"
+            onclick="setDecision(${e.id},'suggested',this)">✎ Suggest</button>
+        </div>
+        <textarea class="suggest-input ${sel==='suggested'?'show':''}"
+          id="sug-${e.id}" rows="2"
+          placeholder="Enter your alternative correction…"
+          oninput="updateSuggestion(${e.id},this.value)"
+        >${esc(sugVal)}</textarea>
+      </div>
+    </td>
+  </tr>`;
+}
+
+// ═══════════════════════════════════════════
+// Decisions
+// ═══════════════════════════════════════════
+function setDecision(errorId, decision, btn) {
+  const id  = String(errorId);
+  const row = document.querySelector(`tr[data-id="${errorId}"]`);
+  if (!row) return;
+  const allBtns = row.querySelectorAll('.dec-btn');
+  const sugInput = document.getElementById(`sug-${errorId}`);
+
+  // Toggle off
+  if (_decisions[id]?.decision === decision) {
+    delete _decisions[id];
+    allBtns.forEach(b => b.classList.remove('sel'));
+    row.className = '';
+    row.dataset.dec = 'pending';
+    if (sugInput) sugInput.classList.remove('show');
+    updateProgress();
+    _applyFilter();
+    return;
+  }
+
+  _decisions[id] = { decision, suggestion: sugInput?.value || '' };
+  allBtns.forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  row.className = `row-${decision}`;
+  row.dataset.dec = decision;
+  if (sugInput) sugInput.classList.toggle('show', decision === 'suggested');
+
+  updateProgress();
+  _applyFilter();
+}
+
+function updateSuggestion(errorId, value) {
+  const id = String(errorId);
+  if (_decisions[id]) _decisions[id].suggestion = value;
+}
+
+function updateProgress() {
+  if (!_session) return;
+  const total   = (_session.report?.errors || []).length;
+  const decided = Object.keys(_decisions).length;
+  const pct     = total ? Math.round(decided / total * 100) : 0;
+
+  const fill  = document.getElementById('prog-fill');
+  const label = document.getElementById('prog-label');
+  if (fill)  fill.style.width = pct + '%';
+  if (label) label.textContent = `${decided} / ${total} reviewed`;
+
+  const btn     = document.getElementById('submit-btn');
+  const summary = document.getElementById('submit-summary');
+  if (btn) btn.disabled = decided === 0;
+  if (summary) {
+    const approved  = Object.values(_decisions).filter(d => d.decision==='approved').length;
+    const rejected  = Object.values(_decisions).filter(d => d.decision==='rejected').length;
+    const suggested = Object.values(_decisions).filter(d => d.decision==='suggested').length;
+    summary.textContent = decided === 0
+      ? 'Make decisions above, then submit.'
+      : `${approved} approved · ${rejected} rejected · ${suggested} suggestions · ${total - decided} undecided`;
+  }
+}
+
+// ═══════════════════════════════════════════
+// Filter
+// ═══════════════════════════════════════════
+function applyFilter(f, btn) {
+  _filter = f;
+  document.querySelectorAll('.filt-btn').forEach(b => b.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+  _applyFilter();
+}
+
+function _applyFilter() {
+  document.querySelectorAll('#rv-tbody tr').forEach(row => {
+    const dec = row.dataset.dec || 'pending';
+    row.classList.toggle('hidden-row', _filter !== 'all' && dec !== _filter);
+  });
+}
+
+// ═══════════════════════════════════════════
+// Submit
+// ═══════════════════════════════════════════
+async function submitReview() {
+  const name = document.getElementById('rv-name')?.value.trim();
+  if (!name) { toast('Enter your name before submitting.', 'warn'); document.getElementById('rv-name')?.focus(); return; }
+  if (!Object.keys(_decisions).length) { toast('Make at least one decision first.', 'warn'); return; }
+
+  const total = (_session.report?.errors || []).length;
+  const decided = Object.keys(_decisions).length;
+  const ok = confirm(
+    `Submit review as "${name}"?\n\n` +
+    `Decisions: ${decided} of ${total} errors reviewed.\n\n` +
+    `Once submitted, the review cannot be changed.`
+  );
+  if (!ok) return;
+
+  setLoading(true, 'Submitting review…');
+  try {
+    await sbPatch(_sessionId, {
+      status:      'reviewed',
+      reviewed_by:  name,
+      reviewed_at:  new Date().toISOString(),
+      decisions:    _decisions
+    });
+
+    // Update local list
+    const list = getSessionsLocal();
+    const s = list.find(x => x.id === _sessionId);
+    if (s) { s.status = 'reviewed'; s.reviewedBy = name; localStorage.setItem('sr_sessions', JSON.stringify(list)); }
+
+    toast('Review submitted! Thank you 🎉');
+    _isResults = true;
+    Object.assign(_session, { status: 'reviewed', reviewed_by: name, reviewed_at: new Date().toISOString(), decisions: _decisions });
+    renderReviewPage();
+  } catch(e) {
+    toast('Submit error: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ═══════════════════════════════════════════
+// Export
+// ═══════════════════════════════════════════
+function exportApproved() {
+  const s = _session;
+  const errors = (s.report?.errors || []).filter(e => {
+    const d = _decisions[String(e.id)];
+    return d && (d.decision === 'approved' || d.decision === 'suggested');
+  });
+
+  const rows = errors.map(e => {
+    const d = _decisions[String(e.id)];
+    const finalCorr = d.decision === 'suggested' ? (d.suggestion || e.corrected) : e.corrected;
+    return `| ${e.id} | ${e.type} | p.${e.page||'?'} | ${e.original} | ${finalCorr} | ${e.explanation} |`;
+  });
+
+  const text = [
+    `# Approved Changes — ${s.doc_name || 'Document'}`,
+    `Reviewed by: ${s.reviewed_by} on ${fmtDate(s.reviewed_at)}`,
+    `Shared by: ${s.initiated_by || '—'}`,
+    ``,
+    `| # | Type | Page | Original | Corrected | Explanation |`,
+    `|---|------|------|----------|-----------|-------------|`,
+    ...rows,
+    ``,
+    `Total: ${errors.length} of ${(s.report?.errors||[]).length} issues accepted`
+  ].join('\n');
+
+  dlBlob(new Blob([text], { type: 'text/plain' }),
+    `${(s.doc_name||'review').replace(/[^a-z0-9]/gi,'_')}-approved.txt`);
+}
+
+function exportFullJSON() {
+  const s = _session;
+  const payload = {
+    doc_name:     s.doc_name,
+    initiated_by: s.initiated_by,
+    reviewed_by:  s.reviewed_by,
+    reviewed_at:  s.reviewed_at,
+    decisions:    _decisions,
+    errors:       s.report?.errors,
+    summary: {
+      total:     (s.report?.errors||[]).length,
+      approved:  Object.values(_decisions).filter(d=>d.decision==='approved').length,
+      rejected:  Object.values(_decisions).filter(d=>d.decision==='rejected').length,
+      suggested: Object.values(_decisions).filter(d=>d.decision==='suggested').length,
+    }
+  };
+  dlBlob(
+    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+    `${(s.doc_name||'review').replace(/[^a-z0-9]/gi,'_')}-results.json`
+  );
+}
+
+// ═══════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════
+(function init() {
+  loadConfig();
+
+  // Pre-fill setup form
+  const uEl = document.getElementById('sb-url');
+  const kEl = document.getElementById('sb-key');
+  const nEl = document.getElementById('sb-name');
+  if (uEl && _sbUrl && _sbUrl !== SB_URL_DEFAULT) uEl.value = _sbUrl;
+  if (kEl && _sbKey && _sbKey !== SB_KEY_DEFAULT) kEl.value = _sbKey;
+  if (nEl && _myName) nEl.value = _myName;
+
+  const params    = new URLSearchParams(location.search);
+  const sessionId = params.get('r');
+
+  if (sessionId) {
+    // Review / results mode
+    document.getElementById('header-tabs').style.display = 'none';
+    loadReviewSession(sessionId);
+  } else {
+    // Dashboard mode
+    document.getElementById('header-tabs').style.display = 'flex';
+    checkConfig();
+    loadLastReport();
+    renderSessions();
+    showPage('dash');
+  }
+})();
+</script>
+</body>
+</html>
