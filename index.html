@@ -50,6 +50,8 @@
     /* ── Pages ── */
     .page { display:none; flex:1; padding:22px 24px; max-width:1280px; margin:0 auto; width:100%; }
     .page.active { display:block; }
+    .app-footer { display:flex; justify-content:space-between; align-items:center; padding:10px 24px; border-top:1px solid var(--border); font-size:11px; color:var(--muted); background:var(--surface); flex-shrink:0; }
+    .app-footer-version { font-weight:600; color:var(--muted); opacity:.7; letter-spacing:.03em; }
 
     /* ── Upload zone ── */
     .upload-zone { border:2px dashed var(--border); border-radius:12px; padding:32px 20px; text-align:center; cursor:pointer; transition:all .2s; background:var(--surface); margin-bottom:8px; }
@@ -253,7 +255,7 @@
       header h1 { color:#111 !important; font-size:14pt !important; }
       header p { color:#555 !important; }
       .logo svg path { fill:#111 !important; }
-      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .sev-filter-bar, .analyse-panel, .header-actions, .export-dropdown { display:none !important; }
+      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .sev-filter-bar, .analyse-panel, .header-actions, .export-dropdown, .app-footer { display:none !important; }
       #report-page { display:block !important; }
       .page { max-width:100% !important; padding:8px 12px !important; }
       #report-cost { display:block !important; color:#555 !important; }
@@ -534,6 +536,11 @@
     </p>
   </div>
 </div>
+
+<footer class="app-footer">
+  <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
+  <span class="app-footer-version">v2.4.1</span>
+</footer>
 
 <div class="toast" id="toast"></div>
 
