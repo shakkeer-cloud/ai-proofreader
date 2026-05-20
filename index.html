@@ -598,6 +598,35 @@ function calcCost(model, inputTok, outputTok) {
 }
 
 // ══════════════════════════════════════════════
+// Robust JSON parser (handles extra text before/after JSON — e.g. Haiku model)
+// ══════════════════════════════════════════════
+function parseClaudeJSON(text) {
+  // Strip markdown code fences if present
+  let s = text.replace(/^```json?\s*/i,'').replace(/\s*```$/i,'').trim();
+  // Fast path: direct parse
+  try { return JSON.parse(s); } catch(_) {}
+  // Bracket-matching: find the outermost { … } and parse just that
+  const start = s.indexOf('{');
+  if (start === -1) throw new Error('No JSON object found in model response');
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    if (esc) { esc = false; continue; }
+    if (s[i] === '\\' && inStr) { esc = true; continue; }
+    if (s[i] === '"') { inStr = !inStr; continue; }
+    if (!inStr) {
+      if (s[i] === '{') depth++;
+      else if (s[i] === '}') {
+        if (--depth === 0) {
+          try { return JSON.parse(s.slice(start, i + 1)); }
+          catch(e) { throw new Error('JSON parse failed: ' + e.message); }
+        }
+      }
+    }
+  }
+  throw new Error('Incomplete JSON in model response (response may have been truncated)');
+}
+
+// ══════════════════════════════════════════════
 // State
 // ══════════════════════════════════════════════
 let fileQueue        = [];
@@ -1280,8 +1309,8 @@ Return ONLY valid JSON (no markdown, no extra text):
         }, apiKey, ci+1, chunks.length, showOnDone);
 
         const data = await res.json();
-        const raw = data.content[0].text.replace(/^```json?\s*/i,'').replace(/\s*```$/i,'').trim();
-        const chunk_report = JSON.parse(raw);
+        console.debug('[Proofreader] chunk', ci+1, 'raw response:', data.content[0].text.slice(0, 300));
+        const chunk_report = parseClaudeJSON(data.content[0].text);
 
         if (!detectedLang && chunk_report.language) detectedLang = chunk_report.language;
         if (chunk_report.word_count) totalWordCount += chunk_report.word_count;
@@ -1314,7 +1343,21 @@ Return ONLY valid JSON (no markdown, no extra text):
               `• Wait 1–2 minutes and retry — the system auto-retried 3 times before stopping`
             );
           } else {
-            toast(`Chunk ${ci+1} error: ${msg}`, 'err');
+            // Show persistent error modal for non-rate-limit errors (e.g. JSON parse failures)
+            const isJsonErr = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse');
+            if (isJsonErr) {
+              showApiError(`Parsing error on chunk ${ci+1}`,
+                `The model returned a response that couldn't be parsed as JSON.<br><br>`+
+                (completedChunks > 0
+                  ? `A partial report for ${completedChunks} of ${chunks.length} chunks has been generated below.<br><br>`
+                  : ``)+
+                `<strong>To fix:</strong><br>`+
+                `• Switch to <strong>Sonnet 4.5</strong> (most reliable JSON output)<br>`+
+                `• Or retry — occasional format issues usually resolve on the next attempt`
+              );
+            } else {
+              toast(`Chunk ${ci+1} error: ${msg}`, 'err');
+            }
           }
         }
         break;
