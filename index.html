@@ -175,13 +175,14 @@
     /* ── Error table ── */
     .table-wrap { overflow-x:auto; border-radius:10px; border:1px solid var(--border); margin-bottom:18px; }
     table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; }
-    colgroup col.col-id   { width:44px; }
-    colgroup col.col-type { width:108px; }
-    colgroup col.col-pg   { width:40px; }
-    colgroup col.col-orig { width:auto; }
-    colgroup col.col-corr { width:auto; }
-    colgroup col.col-copy { width:32px; }
-    colgroup col.col-expl { width:185px; }
+    colgroup col.col-id     { width:44px; }
+    colgroup col.col-type   { width:108px; }
+    colgroup col.col-pg     { width:40px; }
+    colgroup col.col-orig   { width:auto; }
+    colgroup col.col-corr   { width:auto; }
+    colgroup col.col-copy   { width:32px; }
+    colgroup col.col-triage { width:56px; }
+    colgroup col.col-expl   { width:185px; }
     th { background:var(--surface); padding:9px 11px; text-align:left; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); border-bottom:1px solid var(--border); white-space:nowrap; }
     td { padding:9px 11px; border-bottom:1px solid var(--border); vertical-align:top; line-height:1.5; word-break:break-word; overflow-wrap:break-word; }
     tr:last-child td { border-bottom:none; }
@@ -262,7 +263,7 @@
       header h1 { color:#111 !important; font-size:14pt !important; }
       header p { color:#555 !important; }
       .logo svg path { fill:#111 !important; }
-      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .sev-filter-bar, .analyse-panel, .header-actions, .export-dropdown, .app-footer, .triage-cell { display:none !important; }
+      nav, #proof-page, #setup-page, #history-page, .report-actions, .filter-bar, .sev-filter-bar, .analyse-panel, .header-actions, .export-dropdown, .app-footer, .triage-cell, .triage-th, .copy-th, .copy-btn { display:none !important; }
       #report-page { display:block !important; }
       .page { max-width:100% !important; padding:8px 12px !important; }
       #report-cost { display:block !important; color:#555 !important; }
@@ -275,9 +276,9 @@
       .score-circle { border-color:#555 !important; }
       .score-num, .score-grade { color:#111 !important; }
       .table-wrap { border:1px solid #bbb !important; box-shadow:none !important; }
-      table { font-size:8pt !important; }
-      th { background:#f0f0f0 !important; color:#333 !important; border:1px solid #ccc !important; padding:5px 7px !important; }
-      td { border:1px solid #ddd !important; color:#111 !important; padding:5px 7px !important; }
+      table { font-size:8pt !important; table-layout:fixed !important; width:100% !important; }
+      th { background:#f0f0f0 !important; color:#333 !important; border:1px solid #ccc !important; padding:4px 6px !important; }
+      td { border:1px solid #ddd !important; color:#111 !important; padding:4px 6px !important; word-break:normal !important; overflow-wrap:break-word !important; }
       tr:nth-child(even) td { background:#fafafa !important; }
       .badge { border:1px solid #999 !important; }
       mark.orig-mark { background:#fdd !important; color:#c00 !important; }
@@ -286,8 +287,16 @@
       .sev-Moderate { color:#b45 !important; }
       .sev-Minor { color:#777 !important; }
       .check-chip { background:#eee !important; color:#333 !important; border:1px solid #ccc !important; }
-      .copy-btn { display:none !important; }
-      @page { margin:15mm 12mm; }
+      /* Print column widths — fixed layout so explanation gets enough room */
+      colgroup col.col-id    { width:28px !important; }
+      colgroup col.col-type  { width:86px !important; }
+      colgroup col.col-pg    { width:28px !important; }
+      colgroup col.col-orig  { width:19% !important; }
+      colgroup col.col-corr  { width:19% !important; }
+      colgroup col.col-copy  { width:0  !important; }
+      colgroup col.col-triage{ width:0  !important; }
+      colgroup col.col-expl  { width:auto !important; }
+      @page { margin:15mm 12mm; size:A4; }
     }
 
     @media (max-width:600px) {
@@ -497,14 +506,14 @@
           <col class="col-id"><col class="col-type">
           <col class="col-pg" id="col-pg">
           <col class="col-orig"><col class="col-corr">
-          <col class="col-copy"><col style="width:56px"><col class="col-expl">
+          <col class="col-copy"><col class="col-triage"><col class="col-expl">
         </colgroup>
         <thead>
           <tr>
             <th>#</th><th>Type</th>
             <th id="th-pg">Pg</th>
             <th>Original</th><th>Corrected</th>
-            <th></th><th>Status</th><th>Explanation</th>
+            <th class="copy-th"></th><th class="triage-th">Status</th><th>Explanation</th>
           </tr>
         </thead>
         <tbody id="error-body"></tbody>
