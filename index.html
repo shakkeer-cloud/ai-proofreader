@@ -623,6 +623,14 @@ function calcCost(model, inputTok, outputTok) {
   const p = MODEL_PRICING[model] || { in: 3.00, out: 15.00 };
   return (inputTok * p.in + outputTok * p.out) / 1_000_000;
 }
+const MODEL_DISPLAY_NAMES = {
+  'claude-sonnet-4-6':        'Claude Sonnet 4.6',
+  'claude-opus-4-7':          'Claude Opus 4.7',
+  'claude-haiku-4-5-20251001':'Claude Haiku 4.5',
+};
+function modelDisplayName(id) {
+  return MODEL_DISPLAY_NAMES[id] || (id ? id.replace('claude-','Claude ') : 'Claude');
+}
 
 // ══════════════════════════════════════════════
 // Robust JSON parser (handles extra text before/after JSON — e.g. Haiku model)
@@ -1289,8 +1297,13 @@ Severity rules:
 IMPORTANT RULES:
 1. In "original" and "corrected" fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
 2. The text contains "--- Page N ---" markers. Use these to set the "page" field for every error. The "page" field is REQUIRED — every error must have a page number.
-3. Always write "explanation" in plain English (one short sentence, max 20 words), even for non-English documents.
-4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt whether something is an error, do NOT flag it. Every explanation must clearly state what is wrong — never write that the text is correct or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}
+3. Explanation rules — STRICT:
+   - ONE issue per error entry. Never combine two observations into one row.
+   - Start directly with what is WRONG. Never open with what is correct or consistent.
+   - Bad: "The name is spelled consistently; however the pull-quote reads…" — this mixes a non-error with an error.
+   - Good: "Pull-quote adds 'itu' not present in body text — inconsistent wording."
+   - Max 15 words. Plain English only, even for non-English documents.
+4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
@@ -1533,11 +1546,15 @@ function renderReport(r) {
   if (docInfo.filename) parts.push(docInfo.filename);
   document.getElementById('report-meta').textContent=parts.join(' · ');
 
-  // AI cost
+  // AI cost + model
   const costEl=document.getElementById('report-cost');
+  const modelName = modelDisplayName(r._model);
   if (r._cost != null) {
     const usd = r._cost < 0.01 ? `$${r._cost.toFixed(4)}` : `$${r._cost.toFixed(3)}`;
-    costEl.textContent=`AI cost: ${usd} · ${(r._inputTok||0).toLocaleString()} in + ${(r._outputTok||0).toLocaleString()} out tokens`;
+    costEl.textContent=`AI cost: ${usd} · ${(r._inputTok||0).toLocaleString()} in + ${(r._outputTok||0).toLocaleString()} out tokens · ${modelName}`;
+    costEl.style.display='block';
+  } else if (r._model) {
+    costEl.textContent=`Model: ${modelName}`;
     costEl.style.display='block';
   } else {
     costEl.style.display='none';
@@ -1806,7 +1823,10 @@ async function downloadPDF() {
     doc.setFont('helvetica','normal'); doc.setFontSize(8); gg(100);
     const metaParts=[date,lastReport.language||docInfo.language||'',`${(lastReport.word_count||docInfo.wordCount||0).toLocaleString()} words`,`${lastReport.summary.total_errors} issues found`,`Score: ${score}/100 (${grade} — ${label})`].filter(Boolean);
     doc.text(metaParts.join('   ·   '),ML,y); y+=3;
-    if (lastReport._cost) { doc.setFontSize(7); gg(150); doc.text(`AI cost: $${lastReport._cost.toFixed(4)}`,ML,y+2); y+=3; }
+    const pdfCostParts=[];
+    if (lastReport._cost) pdfCostParts.push(`AI cost: $${lastReport._cost.toFixed(4)}`);
+    if (lastReport._model) pdfCostParts.push(`Model: ${modelDisplayName(lastReport._model)}`);
+    if (pdfCostParts.length) { doc.setFontSize(7); gg(150); doc.text(pdfCostParts.join('   ·   '),ML,y+2); y+=3; }
     y+=4; ln(y); y+=5;
 
     // Summary by type
@@ -1916,7 +1936,10 @@ async function downloadWord() {
     const sevCounts={Critical:0,Moderate:0,Minor:0};
     r.errors.forEach(e=>{if(e.severity&&sevCounts[e.severity]!==undefined)sevCounts[e.severity]++;});
     const sevPs=[new Paragraph({children:['Critical','Moderate','Minor'].flatMap(sev=>[new TextRun({text:`${sev}: `,bold:true,color:SEV_HEX[sev],font:FONT,size:16}),new TextRun({text:`${sevCounts[sev]}   `,color:'222222',font:FONT,size:16})]),spacing:{after:60}})];
-    const costLine=r._cost?[p(`AI cost: $${r._cost.toFixed(4)}`,{size:13,color:'94a3b8',after:120})] :[];
+    const wordMetaParts2=[];
+    if (r._cost) wordMetaParts2.push(`AI cost: $${r._cost.toFixed(4)}`);
+    if (r._model) wordMetaParts2.push(`Model: ${modelDisplayName(r._model)}`);
+    const costLine=wordMetaParts2.length?[p(wordMetaParts2.join('   ·   '),{size:13,color:'94a3b8',after:120})]:[];
     const wordDoc=new Document({sections:[{
       properties:{page:{margin:{top:720,bottom:720,left:900,right:900}}},
       children:[
@@ -2081,6 +2104,9 @@ const FALSE_POS_PHRASES = [
   'is correct','already correct','no problem','no error found',
   'correct grammar','well formed','well-formed','found upon review',
   'sentence is correct','text is correct',
+  // Consistency false-positives — opening with "this is consistent" means no actual error
+  'is consistent','are consistent','consistently spelled','consistently used',
+  'no inconsistency','used consistently','spelled consistently','written consistently',
 ];
 function isFalsePositive(error) {
   if (!error || !error.explanation) return false;
@@ -2183,8 +2209,12 @@ async function retryFailedChunks() {
   if (!apiKey) { toast('Set your API key in Setup first.','warn'); showTab('setup'); return; }
 
   const {chunks, startChunkIdx, model, systemPrompt} = _retryState;
+  // Switch to proof page so the user sees the loading progress bar
+  showTab('proof');
   setLoading(true);
   setProgressStage('analyzing');
+  document.getElementById('loading-title').textContent = `Continuing — chunk ${startChunkIdx + 1} of ${chunks.length}`;
+  document.getElementById('loading-sub').textContent = `Resuming proofreading…`;
 
   const newErrors = [...lastReport.errors];
   let newInputTok = lastReport._inputTok || 0;
@@ -2273,15 +2303,19 @@ async function retryFailedChunks() {
     trackCost(addedCost);
     completeProgress();
     renderReport(updatedReport);
+    showTab('report'); // switch back to the report page
 
     if (!newPartialStart) {
       toast(`Complete! ${finalTotals.total_errors} issues found total.`);
       sendCompletionNotification(updatedReport);
+    } else {
+      toast(`Continued — ${finalTotals.total_errors} issues found so far. ${chunks.length - totalCompleted} chunk(s) remaining.`,'warn');
     }
 
   } catch(err) {
     toast('Error: ' + err.message, 'err');
     console.error(err);
+    showTab('report'); // go back to report even on error
   } finally {
     setLoading(false);
     document.getElementById('loading-title').textContent = 'Analyzing document…';
@@ -2293,9 +2327,17 @@ async function retryFailedChunks() {
 // ══════════════════════════════════════════════
 function saveLastReport(report) {
   try {
-    localStorage.setItem('proof_last_report', JSON.stringify({
-      report, di: {...docInfo}, ts: Date.now()
-    }));
+    const payload = {report, di: {...docInfo}, ts: Date.now()};
+    // If there are remaining chunks, save enough to rebuild the retry state after refresh
+    // We store startChunkIdx + model + systemPrompt (small); chunks are rebuilt from pageTexts
+    if (_retryState) {
+      payload.retryInfo = {
+        startChunkIdx: _retryState.startChunkIdx,
+        model:         _retryState.model,
+        systemPrompt:  _retryState.systemPrompt,
+      };
+    }
+    localStorage.setItem('proof_last_report', JSON.stringify(payload));
   } catch(e) {} // localStorage full — ignore
 }
 
@@ -2303,12 +2345,30 @@ function loadSavedReport() {
   try {
     const raw = localStorage.getItem('proof_last_report');
     if (!raw) return;
-    const {report, di, ts} = JSON.parse(raw);
+    const {report, di, ts, retryInfo} = JSON.parse(raw);
     if (Date.now() - ts > 24 * 3600 * 1000) return; // expire after 24 h
     lastReport = report;
     docInfo = di;
+
+    // Rebuild _retryState so the "Continue" button works after a refresh
+    if (report._partial && retryInfo && di && di.pageTexts && di.pageTexts.length) {
+      try {
+        const pagedText = di.pageTexts.length > 1
+          ? di.pageTexts.map((t, i) => `--- Page ${i+1} ---\n${t}`).join('\n\n')
+          : di.pageTexts[0] || '';
+        if (pagedText) {
+          const chunks = addChunkOverlap(splitIntoChunks(pagedText, CHUNK_SIZE), CHUNK_OVERLAP);
+          _retryState = {
+            chunks,
+            startChunkIdx: retryInfo.startChunkIdx,
+            model:         retryInfo.model,
+            systemPrompt:  retryInfo.systemPrompt,
+          };
+        }
+      } catch(e) { _retryState = null; }
+    }
+
     renderReport(report);
-    // Switch to report tab silently (no toast — user may not expect it)
     showTab('report');
   } catch(e) {}
 }
