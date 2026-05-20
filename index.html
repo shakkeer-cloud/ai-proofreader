@@ -575,7 +575,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v2.7.0</span>
+  <span class="app-footer-version">v2.7.1</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1336,6 +1336,13 @@ Return ONLY valid JSON (no markdown, no extra text):
     : text;
 
   const chunks = addChunkOverlap(splitIntoChunks(pagedText, CHUNK_SIZE), CHUNK_OVERLAP);
+
+  // Warn when Haiku is used on a large document — Haiku's output limit can cause
+  // JSON truncation when a chunk produces many errors (common in long, error-heavy docs)
+  if (model === 'claude-haiku-4-5-20251001' && chunks.length > 8 && showOnDone) {
+    toast(`⚠️ ${chunks.length} chunks with Haiku — large documents may hit Haiku's output limit. Switch to Sonnet 4.6 if results are incomplete.`, 'warn');
+  }
+
   let allErrors = [], totalInputTok = 0, totalOutputTok = 0;
   let detectedLang = '', totalWordCount = 0;
   const summaryTotals = {};
@@ -1545,7 +1552,23 @@ Return ONLY valid JSON (no markdown, no extra text):
         } else if (msg.toLowerCase().includes('invalid')&&msg.toLowerCase().includes('api')) {
           showApiError('Invalid API key','The API key in Setup is invalid or expired.<br><br>Go to <strong>console.anthropic.com → API Keys</strong> to generate a new key.');
         } else {
-          toast('Error: '+msg,'err');
+          // Show a persistent failed-run banner on the report tab so it isn't missed
+          const isJsonErr = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse') ||
+                            msg.toLowerCase().includes('incomplete');
+          const docName = docInfo.filename || 'this document';
+          const wc = docInfo.wordCount ? `${docInfo.wordCount.toLocaleString()}-word ` : '';
+          showApiError(
+            `Proofread failed — no results saved`,
+            `Zero chunks completed on the ${wc}<strong>${esc(docName)}</strong> run.<br><br>`+
+            (isJsonErr
+              ? `<strong>Cause:</strong> The model returned JSON that couldn't be parsed after 3 attempts. This usually means each chunk produced too many errors for the model's output limit.<br><br>`+
+                `<strong>Fix:</strong><br>`+
+                `• Switch to <strong>Sonnet 4.6</strong> — much more reliable JSON output for large, error-heavy documents<br>`+
+                `• Or split the document into smaller parts and proofread each separately`
+              : `<strong>Error:</strong> ${esc(msg)}<br><br>`+
+                `<strong>Tip:</strong> Try again, or switch to Sonnet 4.6 for more reliable results on large documents`)
+          );
+          showTab('report'); // navigate to report so the modal is visible
         }
       }
     }
@@ -1789,7 +1812,7 @@ function saveToHistory(report) {
     score:calculateScore(report),
     summary:report.summary,
     errors:report.errors,
-    docInfoSnap:{...docInfo},
+    docInfoSnap:{...docInfo, pageTexts:[]}, // strip pageTexts — too large for localStorage
   };
   history.unshift(entry);
   if (history.length>20) history.pop();
@@ -2415,9 +2438,9 @@ async function retryFailedChunks() {
 // ══════════════════════════════════════════════
 function saveLastReport(report) {
   try {
-    const payload = {report, di: {...docInfo}, ts: Date.now()};
-    // If there are remaining chunks, save enough to rebuild the retry state after refresh
-    // We store startChunkIdx + model + systemPrompt (small); chunks are rebuilt from pageTexts
+    // Strip pageTexts from di — stored separately to avoid blowing localStorage quota
+    const diLite = {...docInfo, pageTexts: []};
+    const payload = {report, di: diLite, ts: Date.now()};
     if (_retryState) {
       payload.retryInfo = {
         startChunkIdx: _retryState.startChunkIdx,
@@ -2426,6 +2449,18 @@ function saveLastReport(report) {
       };
     }
     localStorage.setItem('proof_last_report', JSON.stringify(payload));
+
+    // Store pageTexts separately for retry reconstruction — skip if too large (> 2 MB)
+    if (docInfo.pageTexts && docInfo.pageTexts.length) {
+      try {
+        const textsJson = JSON.stringify(docInfo.pageTexts);
+        if (textsJson.length < 2 * 1024 * 1024) {
+          localStorage.setItem('proof_page_texts', textsJson);
+        } else {
+          localStorage.removeItem('proof_page_texts'); // too large — retry unavailable
+        }
+      } catch(e) { localStorage.removeItem('proof_page_texts'); }
+    }
   } catch(e) {} // localStorage full — ignore
 }
 
@@ -2454,20 +2489,28 @@ function loadSavedReport() {
     lastReport = report;
     docInfo = di;
 
-    // Rebuild _retryState so the "Continue" button works after a refresh
-    if (report._partial && retryInfo && di && di.pageTexts && di.pageTexts.length) {
+    // Rebuild _retryState — pageTexts now stored in separate key to save quota
+    if (report._partial && retryInfo) {
       try {
-        const pagedText = di.pageTexts.length > 1
-          ? di.pageTexts.map((t, i) => `--- Page ${i+1} ---\n${t}`).join('\n\n')
-          : di.pageTexts[0] || '';
-        if (pagedText) {
-          const chunks = addChunkOverlap(splitIntoChunks(pagedText, CHUNK_SIZE), CHUNK_OVERLAP);
-          _retryState = {
-            chunks,
-            startChunkIdx: retryInfo.startChunkIdx,
-            model:         retryInfo.model,
-            systemPrompt:  retryInfo.systemPrompt,
-          };
+        // Try di.pageTexts first (old format), then dedicated key (new format)
+        let pageTexts = (di.pageTexts && di.pageTexts.length) ? di.pageTexts : [];
+        if (!pageTexts.length) {
+          const raw2 = localStorage.getItem('proof_page_texts');
+          if (raw2) pageTexts = JSON.parse(raw2);
+        }
+        if (pageTexts.length) {
+          const pagedText = pageTexts.length > 1
+            ? pageTexts.map((t, i) => `--- Page ${i+1} ---\n${t}`).join('\n\n')
+            : pageTexts[0] || '';
+          if (pagedText) {
+            const chunks = addChunkOverlap(splitIntoChunks(pagedText, CHUNK_SIZE), CHUNK_OVERLAP);
+            _retryState = {
+              chunks,
+              startChunkIdx: retryInfo.startChunkIdx,
+              model:         retryInfo.model,
+              systemPrompt:  retryInfo.systemPrompt,
+            };
+          }
         }
       } catch(e) { _retryState = null; }
     }
