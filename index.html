@@ -358,11 +358,33 @@
   <div class="options-row">
     <div class="field">
       <label>Language</label>
-      <select id="language">
+      <select id="language" onchange="toggleOtherLang(this.value)">
         <option value="auto" selected>Auto-detect</option>
-        <option value="english">English</option>
         <option value="arabic">Arabic (عربي)</option>
+        <option value="azerbaijani">Azerbaijani (Azərbaycanca)</option>
+        <option value="bengali">Bengali (বাংলা)</option>
+        <option value="danish">Danish (Dansk)</option>
+        <option value="dutch">Dutch (Nederlands)</option>
+        <option value="english">English</option>
+        <option value="french">French (Français)</option>
+        <option value="german">German (Deutsch)</option>
+        <option value="hindi">Hindi (हिन्दी)</option>
+        <option value="indonesian">Indonesian (Bahasa Indonesia)</option>
+        <option value="malay">Malay (Bahasa Melayu)</option>
+        <option value="mandarin">Mandarin (中文)</option>
+        <option value="portuguese">Portuguese (Português)</option>
+        <option value="russian">Russian (Русский)</option>
+        <option value="spanish">Spanish (Español)</option>
+        <option value="swedish">Swedish (Svenska)</option>
+        <option value="tagalog">Tagalog (Filipino)</option>
+        <option value="tamil">Tamil (தமிழ்)</option>
+        <option value="thai">Thai (ภาษาไทย)</option>
+        <option value="turkish">Turkish (Türkçe)</option>
+        <option value="urdu">Urdu (اردو)</option>
+        <option value="vietnamese">Vietnamese (Tiếng Việt)</option>
+        <option value="other">Other…</option>
       </select>
+      <input type="text" id="language-other" placeholder="e.g. Tagalog, Swahili, Hindi…" style="display:none;margin-top:6px;width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--sf2);color:var(--text);font-size:12px">
     </div>
     <div class="field">
       <label>AI Model</label>
@@ -401,6 +423,9 @@
   </div>
 
   <div id="report-content" style="display:none">
+    <div id="partial-warning" style="display:none;background:#f9731615;border:1px solid #f9731640;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#f97316">
+      ⚠️ <strong>Partial analysis</strong> — <span id="partial-warning-text"></span>. Errors below cover the completed portion only. Re-upload or wait 1 min and retry for full coverage.
+    </div>
     <div class="report-header">
       <div class="report-header-left">
         <div class="report-title">Proofreading Report</div>
@@ -415,6 +440,7 @@
         <div class="score-label" id="score-label"></div>
       </div>
       <div class="report-actions">
+        <button class="btn btn-secondary btn-sm" onclick="startNewDocument()">+ New Document</button>
         <div class="export-dropdown" id="export-dropdown">
           <button class="btn btn-primary btn-sm" onclick="toggleExportMenu(event)">
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -518,6 +544,7 @@
     <div class="modal-row"><span class="lbl">Document</span><span class="val" id="cm-filename" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
     <div class="modal-row"><span class="lbl">Words</span><span class="val" id="cm-words"></span></div>
     <div class="modal-row"><span class="lbl">Chunks</span><span class="val" id="cm-chunks"></span></div>
+    <div class="modal-row"><span class="lbl">Est. time</span><span class="val" id="cm-time"></span></div>
     <div class="modal-row"><span class="lbl">Checks</span><span class="val" id="cm-checks"></span></div>
     <div class="modal-row"><span class="lbl">Model</span><span class="val" id="cm-model"></span></div>
     <div class="modal-row" style="border-bottom:none;margin-top:4px"><span class="lbl">Estimated cost</span><span class="modal-cost" id="cm-cost"></span></div>
@@ -557,7 +584,8 @@ const GRADE_CONFIG = [
   [60,'D','#f97316','Needs Work'], [0,'F','#ef4444','Poor'],
 ];
 const CHAR_LIMIT = 300000;
-const CHUNK_SIZE  = 240000;
+const CHUNK_SIZE  = 60000;   // ~15k tokens/chunk — safely under 30k tokens/min rate limit
+const RATE_LIMIT_WAIT_S = 65; // seconds to pause between chunks
 const MODEL_PRICING = {
   'claude-sonnet-4-6':       { in: 3.00,  out: 15.00 },
   'claude-opus-4-7':         { in: 15.00, out: 75.00 },
@@ -583,6 +611,19 @@ let docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordC
 // ══════════════════════════════════════════════
 // Theme
 // ══════════════════════════════════════════════
+function startNewDocument() {
+  lastReport = null;
+  lastExtractedText = '';
+  fileQueue = [];
+  docInfo = {filename:'',ext:'',fileSize:0,pages:null,pageTexts:[],wordCount:0,charCount:0,paraCount:0,images:null,graphics:null,tables:null,language:''};
+  document.getElementById('paste-area').value = '';
+  const fi = document.getElementById('file-input'); if (fi) fi.value = '';
+  renderFileQueue();
+  document.getElementById('report-content').style.display = 'none';
+  document.getElementById('report-empty').style.display = 'block';
+  showTab('proof');
+}
+
 function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.dataset.theme !== 'light';
@@ -733,18 +774,31 @@ function countWords(t) { return (t.match(/\S+/g)||[]).length; }
 // ══════════════════════════════════════════════
 // Language detection
 // ══════════════════════════════════════════════
+function toggleOtherLang(val) {
+  const inp=document.getElementById('language-other');
+  inp.style.display=val==='other'?'block':'none';
+  if(val==='other') inp.focus();
+}
+
 function detectLanguage(text) {
   if (!text) return 'Unknown';
   if (/[؀-ۿ]/.test(text)) return 'Arabic';
   if (/[一-鿿]/.test(text)) return 'Chinese';
   if (/[Ѐ-ӿ]/.test(text)) return 'Russian';
   const lc=text.toLowerCase();
-  const fr=(lc.match(/\b(le|la|les|de|du|en|est|pour|dans|que|avec|par|sur|mais|une|des)\b/g)||[]).length;
-  const es=(lc.match(/\b(el|la|los|las|de|del|en|es|para|con|por|que|pero|son|una|más)\b/g)||[]).length;
-  const en=(lc.match(/\b(the|a|an|is|are|was|were|have|has|this|that|with|for|from|they)\b/g)||[]).length;
-  if (fr>es&&fr>en) return 'French';
-  if (es>en&&es>fr) return 'Spanish';
-  return 'English';
+  const id=(lc.match(/\b(yang|dengan|untuk|tidak|adalah|bahwa|atau|juga|sudah|dari|pada|ini|itu|akan|bisa|mereka|kita|saya|anda|sebuah|dalam|lebih|setelah|namun|tersebut|sebagai|telah|jika|maka|oleh|antara|dapat)\b/g)||[]).length;
+  const ms=(lc.match(/\b(yang|dengan|untuk|tidak|adalah|atau|juga|sudah|dari|pada|ini|itu|akan|boleh|mereka|kita|saya|anda|dalam|lebih|selepas|namun|tersebut|sebagai|telah|jika|maka|oleh|antara|dapat|kerana|kepada)\b/g)||[]).length;
+  const fr=(lc.match(/\b(le|la|les|de|du|en|est|pour|dans|que|avec|par|sur|mais|une|des|ce|se|ne|pas|au|leur|ils|elle|nous|vous|être|avoir)\b/g)||[]).length;
+  const es=(lc.match(/\b(el|la|los|las|de|del|en|es|para|con|por|que|pero|son|una|más|se|no|su|le|al|mi|lo|me|ni|si|fue|hay)\b/g)||[]).length;
+  const en=(lc.match(/\b(the|a|an|is|are|was|were|have|has|this|that|with|for|from|they|be|at|by|do|it|in|of|on|or|we|he|she|you|his|her)\b/g)||[]).length;
+  const de=(lc.match(/\b(der|die|das|ist|ein|eine|und|mit|für|von|auf|dem|den|ich|sie|nicht|auch|an|es|des|im|zu|dass|wird|sich)\b/g)||[]).length;
+  const scores={Indonesian:id,Malay:ms,French:fr,Spanish:es,German:de,English:en};
+  const top=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
+  if (top[1]===0) return 'English';
+  // Require a clear margin to avoid false positives from shared Latin words
+  const second=Object.entries(scores).sort((a,b)=>b[1]-a[1])[1];
+  if (top[1]<=second[1]*1.3&&(top[0]==='Spanish'||top[0]==='French')&&(second[0]==='Indonesian'||second[0]==='Malay')) return second[0];
+  return top[0];
 }
 
 function findPage(s) {
@@ -924,10 +978,15 @@ let _pendingProofreadArgs = null;
 
 function showConfirmModal(file, pasteText, apiKey) {
   const text = lastExtractedText || pasteText || '';
+  // Use page-aware text length for accurate chunk count
+  const pagedLen = docInfo.pageTexts.length > 1
+    ? docInfo.pageTexts.reduce((n,t,i)=>n+t.length+14+String(i+1).length, 0)
+    : text.length;
   const words = docInfo.wordCount || countWords(text);
   const model = document.getElementById('model').value;
   const modelNames = { 'claude-sonnet-4-6':'Sonnet 4.6', 'claude-opus-4-7':'Opus 4.7', 'claude-haiku-4-5-20251001':'Haiku 4.5' };
-  const numChunks = Math.ceil(text.length / CHUNK_SIZE) || 1;
+  const numChunks = Math.ceil(pagedLen / CHUNK_SIZE) || 1;
+  const estTimeSec = estimateProofreadTime(numChunks);
   const estCost = estimatePreflightCost(text, model, numChunks);
   const checks = selectedChecks.size===0 ? 'All checks' : [...selectedChecks].join(', ');
   const fname = docInfo.filename || (file?.name) || 'Pasted text';
@@ -935,6 +994,7 @@ function showConfirmModal(file, pasteText, apiKey) {
   document.getElementById('cm-filename').textContent = fname;
   document.getElementById('cm-words').textContent = words.toLocaleString();
   document.getElementById('cm-chunks').textContent = numChunks === 1 ? '1 (single pass)' : `${numChunks} chunks`;
+  document.getElementById('cm-time').textContent = numChunks <= 1 ? 'Under 30 seconds' : fmtTime(estTimeSec);
   document.getElementById('cm-checks').textContent = checks;
   document.getElementById('cm-model').textContent = modelNames[model] || model;
   document.getElementById('cm-cost').textContent = estCost < 0.01 ? `~$${estCost.toFixed(4)}` : `~$${estCost.toFixed(3)}`;
@@ -976,6 +1036,63 @@ function splitIntoChunks(text, size) {
     pos = end;
   }
   return chunks.filter(c => c.length > 0);
+}
+
+// ══════════════════════════════════════════════
+// Large-document & rate-limit helpers
+// ══════════════════════════════════════════════
+function isRateLimitError(msg) {
+  const m=(msg||'').toLowerCase();
+  return m.includes('rate limit')||m.includes('tokens per minute')||
+         m.includes('exceed')||m.includes('overloaded')||m.includes('529');
+}
+
+function fmtTime(seconds) {
+  if (seconds < 90) return `~${Math.ceil(seconds)}s`;
+  return `~${Math.ceil(seconds/60)} min`;
+}
+
+function estimateProofreadTime(numChunks) {
+  // First chunk ~15s; each additional: RATE_LIMIT_WAIT_S + 15s processing
+  if (numChunks<=1) return 15;
+  return 15 + (numChunks-1) * (RATE_LIMIT_WAIT_S + 15);
+}
+
+function getChunkPageRange(chunkText) {
+  const matches=[...chunkText.matchAll(/--- Page (\d+) ---/g)];
+  if (!matches.length) return null;
+  const pages=matches.map(m=>parseInt(m[1]));
+  const first=pages[0], last=pages[pages.length-1];
+  return first===last ? `p.${first}` : `pp.${first}–${last}`;
+}
+
+async function sleepWithCountdown(seconds, onTick) {
+  for (let s=seconds; s>0; s--) { onTick(s); await new Promise(r=>setTimeout(r,1000)); }
+}
+
+async function callApiWithRetry(payload, apiKey, ci, total, showUI) {
+  const MAX_RETRIES=3;
+  for (let attempt=0; attempt<MAX_RETRIES; attempt++) {
+    if (attempt>0) {
+      await sleepWithCountdown(RATE_LIMIT_WAIT_S, s=>{
+        if (showUI) {
+          document.getElementById('loading-title').textContent=`Chunk ${ci} of ${total} — rate limited`;
+          document.getElementById('loading-sub').textContent=`Auto-retrying in ${s}s… (attempt ${attempt+1} of ${MAX_RETRIES})`;
+        }
+      });
+    }
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,
+               'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify(payload),
+    });
+    if (res.ok) return res;
+    const e=await res.json().catch(()=>({}));
+    const msg=e.error?.message||`API error ${res.status}`;
+    if (isRateLimitError(msg)&&attempt<MAX_RETRIES-1) continue;
+    throw new Error(msg);
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -1060,11 +1177,18 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
   const model = document.getElementById('model').value;
   const extra = document.getElementById('ai-instructions').value.trim();
 
-  const langLine = lang==='arabic'
-    ? 'The document is in Arabic.'
-    : lang==='english'
-    ? 'The document is in English.'
-    : 'Auto-detect the document language.';
+  const LANG_NAMES={english:'English',arabic:'Arabic',french:'French',spanish:'Spanish',
+    portuguese:'Portuguese',german:'German',dutch:'Dutch',turkish:'Turkish',
+    indonesian:'Indonesian (Bahasa Indonesia)',malay:'Malay (Bahasa Melayu)',
+    azerbaijani:'Azerbaijani',bengali:'Bengali',danish:'Danish',hindi:'Hindi',
+    mandarin:'Mandarin Chinese',russian:'Russian',swedish:'Swedish',tagalog:'Tagalog',
+    tamil:'Tamil',thai:'Thai',urdu:'Urdu',vietnamese:'Vietnamese'};
+  const customLang=(lang==='other'?(document.getElementById('language-other').value.trim()||''):null);
+  if (lang==='other'&&!customLang) { toast('Please enter the document language.','warn'); return; }
+  const resolvedLang=customLang||LANG_NAMES[lang]||lang;
+  const langLine = lang==='auto'
+    ? 'Identify the document language carefully from its content. IMPORTANT: Indonesian (Bahasa Indonesia) and Malay (Bahasa Melayu) use Latin script and may superficially resemble Spanish or Portuguese — check for distinctive Indonesian/Malay words (yang, dengan, untuk, tidak, adalah, dari, pada, ini, itu, akan, bisa, kerana, kepada) before concluding it is a Romance language. Report the exact language name in the "language" field.'
+    : `The document is in ${resolvedLang}. Proofread it applying ${resolvedLang} grammar, spelling, and punctuation rules.`;
 
   const checks = selectedChecks.size > 0 ? [...selectedChecks] : ALL_TYPES;
   const checksLine = `Check ONLY these error types: ${checks.join(', ')}.`;
@@ -1073,7 +1197,7 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
 ${checksLine}
 
 Error type definitions — use EXACTLY these categories, no others:
-- Typos: ONLY exact word-level duplicates where the same word appears twice in a row (e.g. "the the", "and and"). Do NOT use Typos for sentence-level repetition or content that appears in multiple sentences — that is Consistency.
+- Typos: ONLY exact word-level duplicates where the same word appears twice in a row (e.g. "the the", "and and"). Do NOT flag: text that appears in both a pull-quote/callout and body text (that is a layout feature); letter-spaced decorative headings (e.g. "K E N A N G A N"); repeated captions or headers. Only flag duplicates within continuous flowing body text.
 - Spelling: misspelled words AND wrong word forms (e.g. "informations" instead of "information", "childs" instead of "children"). Homophones used incorrectly (there/their/they're) are also Spelling.
 - Grammar: subject-verb disagreement, wrong verb tense, missing or wrong auxiliary verbs (e.g. "must addressed" → "must address"), run-on sentences, sentence fragments.
 - Punctuation: missing or wrong commas, incorrect apostrophes (including missing apostrophes in contractions), missing colons or semicolons.
@@ -1087,82 +1211,154 @@ Severity rules:
 - Moderate: Clear errors that distract but do not change meaning (wrong punctuation, capitalisation, consistency).
 - Minor: Style preferences, clarity suggestions.
 
-IMPORTANT: Always write the "explanation" field in simple, plain English — even if the document is in another language. Keep explanations short and clear (one sentence).
+IMPORTANT RULES:
+1. In "original" and "corrected" fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
+2. The text contains "--- Page N ---" markers. Use these to set the "page" field for every error. The "page" field is REQUIRED — every error must have a page number.
+3. Always write "explanation" in plain English (one sentence), even for non-English documents.
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
   "language":"<detected language name>",
   "word_count":<int>,
   "summary":{"total_errors":<int>,"Typos":<int>,"Spelling":<int>,"Grammar":<int>,"Punctuation":<int>,"Capitalization":<int>,"Style":<int>,"Consistency":<int>,"Clarity":<int>},
-  "errors":[{"id":1,"type":"<type>","severity":"Critical|Moderate|Minor","context":"<sentence containing error, ≤150 chars>","original":"<exact error text>","corrected":"<fix>","explanation":"<one plain-English sentence>"}]
+  "errors":[{"id":1,"type":"<type>","severity":"Critical|Moderate|Minor","page":<int>,"context":"<sentence containing error, ≤150 chars>","original":"<exact error text, preserve casing>","corrected":"<fix>","explanation":"<one plain-English sentence>"}]
 }${extra?'\n\nAdditional instructions:\n'+extra:''}`;
 
-  const chunks = splitIntoChunks(text, CHUNK_SIZE);
+  // Build page-aware text with --- Page N --- markers so Claude knows page numbers
+  const pagedText = (docInfo.pageTexts.length > 1)
+    ? docInfo.pageTexts.map((t,i)=>`--- Page ${i+1} ---\n${t}`).join('\n\n')
+    : text;
+
+  const chunks = splitIntoChunks(pagedText, CHUNK_SIZE);
   let allErrors = [], totalInputTok = 0, totalOutputTok = 0;
   let detectedLang = '', totalWordCount = 0;
   const summaryTotals = {};
   ALL_TYPES.forEach(t => summaryTotals[t] = 0);
+  let completedChunks = 0, partialFromChunk = -1, lastChunkErr = null;
 
   setProgressStage('analyzing');
+  if (chunks.length > 1 && showOnDone) {
+    document.getElementById('loading-sub').textContent =
+      `${chunks.length} chunks · estimated ${fmtTime(estimateProofreadTime(chunks.length))}`;
+  }
 
   try {
     for (let ci = 0; ci < chunks.length; ci++) {
-      if (chunks.length > 1) {
-        document.getElementById('loading-title').textContent = `Analyzing chunk ${ci+1} of ${chunks.length}…`;
-        document.getElementById('loading-sub').textContent = `Sending chunk ${ci+1} to Claude…`;
-        document.getElementById('progress-bar').style.width = (40 + (ci / chunks.length) * 50) + '%';
+      // Pause between chunks to stay under rate limit
+      if (ci > 0) {
+        const remSec = estimateProofreadTime(chunks.length - ci);
+        await sleepWithCountdown(RATE_LIMIT_WAIT_S, s => {
+          if (showOnDone) {
+            document.getElementById('loading-title').textContent = `Chunk ${ci} of ${chunks.length} complete`;
+            document.getElementById('loading-sub').textContent =
+              `Next chunk in ${s}s · ${fmtTime(remSec)} remaining`;
+            document.getElementById('progress-bar').style.width = (30 + (ci / chunks.length) * 60) + '%';
+          }
+        });
       }
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-        body:JSON.stringify({ model, max_tokens:16000, system:systemPrompt, messages:[{role:'user',content:`Proofread this document${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}] }),
-      });
-      if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`API error ${res.status}`); }
-      const data = await res.json();
-      const raw  = data.content[0].text.replace(/^```json?\s*/i,'').replace(/\s*```$/i,'').trim();
-      const chunk_report = JSON.parse(raw);
+      // Progress UI
+      const pRange = getChunkPageRange(chunks[ci]);
+      const pLabel = pRange ? ` · ${pRange}` : '';
+      const remLabel = (chunks.length > 1 && ci < chunks.length-1)
+        ? ` · ${fmtTime(estimateProofreadTime(chunks.length-ci-1))} remaining` : '';
+      if (showOnDone) {
+        document.getElementById('loading-title').textContent =
+          `Analyzing chunk ${ci+1} of ${chunks.length}${pLabel}`;
+        document.getElementById('loading-sub').textContent = `Sending to Claude…${remLabel}`;
+        document.getElementById('progress-bar').style.width =
+          (30 + ((ci + 0.5) / chunks.length) * 60) + '%';
+      }
 
-      if (!detectedLang && chunk_report.language) detectedLang = chunk_report.language;
-      if (chunk_report.word_count) totalWordCount += chunk_report.word_count;
-      if (data.usage) { totalInputTok += data.usage.input_tokens||0; totalOutputTok += data.usage.output_tokens||0; }
+      try {
+        const res = await callApiWithRetry({
+          model, max_tokens:16000, system:systemPrompt,
+          messages:[{role:'user', content:
+            `Proofread this text${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}]
+        }, apiKey, ci+1, chunks.length, showOnDone);
 
-      const idOffset = allErrors.length;
-      (chunk_report.errors||[]).forEach((e, idx) => {
-        e.id = idOffset + idx + 1;
-        if (docInfo.pageTexts.length && !e.page) e.page = findPage(e.original) || findPage(e.context);
-        allErrors.push(e);
-        if (summaryTotals[e.type] !== undefined) summaryTotals[e.type]++;
-      });
+        const data = await res.json();
+        const raw = data.content[0].text.replace(/^```json?\s*/i,'').replace(/\s*```$/i,'').trim();
+        const chunk_report = JSON.parse(raw);
+
+        if (!detectedLang && chunk_report.language) detectedLang = chunk_report.language;
+        if (chunk_report.word_count) totalWordCount += chunk_report.word_count;
+        if (data.usage) { totalInputTok += data.usage.input_tokens||0; totalOutputTok += data.usage.output_tokens||0; }
+
+        const idOffset = allErrors.length;
+        (chunk_report.errors||[]).forEach((e, idx) => {
+          e.id = idOffset + idx + 1;
+          // Fallback: if Claude didn't return page, try to find it client-side
+          if (!e.page && docInfo.pageTexts.length)
+            e.page = findPage(e.original) || findPage(e.context);
+          allErrors.push(e);
+          if (summaryTotals[e.type] !== undefined) summaryTotals[e.type]++;
+        });
+        completedChunks++;
+
+      } catch(chunkErr) {
+        lastChunkErr = chunkErr;
+        partialFromChunk = ci + 1;
+        const msg = chunkErr.message||'';
+        if (showOnDone) {
+          if (isRateLimitError(msg)) {
+            showApiError('Rate limit reached',
+              `Rate limit hit on chunk ${ci+1} of ${chunks.length} (30,000 tokens/min exceeded).<br><br>`+
+              (completedChunks > 0
+                ? `A partial report for chunks 1–${completedChunks} has been generated below.<br><br>`
+                : ``)+
+              `<strong>Tips:</strong><br>`+
+              `• Switch to <strong>Haiku 4.5</strong> (fastest, lowest token usage)<br>`+
+              `• Wait 1–2 minutes and retry — the system auto-retried 3 times before stopping`
+            );
+          } else {
+            toast(`Chunk ${ci+1} error: ${msg}`, 'err');
+          }
+        }
+        break;
+      }
     }
 
-    setProgressStage('building');
-    const summary = { total_errors: allErrors.length, ...summaryTotals };
-    const report = {
-      language: detectedLang || docInfo.language,
-      word_count: totalWordCount || docInfo.wordCount,
-      summary,
-      errors: allErrors,
-      _checks: selectedChecks.size > 0 ? [...selectedChecks] : null,
-      _inputTok: totalInputTok,
-      _outputTok: totalOutputTok,
-      _model: model,
-      _cost: calcCost(model, totalInputTok, totalOutputTok),
-    };
+    // Always generate a report if any chunks completed
+    if (completedChunks > 0) {
+      setProgressStage('building');
+      const summary = { total_errors: allErrors.length, ...summaryTotals };
+      const report = {
+        language: detectedLang || docInfo.language,
+        word_count: docInfo.wordCount || totalWordCount, // client-side count is authoritative
+        summary, errors: allErrors,
+        _checks: selectedChecks.size > 0 ? [...selectedChecks] : null,
+        _inputTok: totalInputTok, _outputTok: totalOutputTok,
+        _model: model,
+        _cost: calcCost(model, totalInputTok, totalOutputTok),
+        _partial: partialFromChunk > 0 ? { completed: completedChunks, total: chunks.length } : null,
+      };
+      lastReport = report;
+      saveToHistory(report);
+      completeProgress();
+      if (showOnDone) {
+        renderReport(report);
+        showTab('report');
+        if (!partialFromChunk)
+          toast(`Found ${report.summary.total_errors} issue${report.summary.total_errors!==1?'s':''}.`);
+      }
+    } else {
+      // Zero chunks completed — throw to outer catch for error display
+      throw lastChunkErr || new Error('Proofread failed.');
+    }
 
-    lastReport = report;
-    saveToHistory(report);
-    completeProgress();
-    if (showOnDone) { renderReport(report); showTab('report'); toast(`Found ${report.summary.total_errors} issue${report.summary.total_errors!==1?'s':''}.`); }
   } catch(err) {
+    // Only reaches here when completedChunks === 0
     if (showOnDone) {
       const msg = err.message||'';
-      if (msg.toLowerCase().includes('credit') || msg.toLowerCase().includes('billing') || msg.includes('402')) {
-        showApiError('No API credits', 'Your Anthropic API key has run out of credits.<br><br>Go to <strong>console.anthropic.com → Billing</strong> to add credits, then try again.');
-      } else if (msg.toLowerCase().includes('invalid') && msg.toLowerCase().includes('api')) {
-        showApiError('Invalid API key', 'The API key in Setup is invalid or expired.<br><br>Go to <strong>console.anthropic.com → API Keys</strong> to generate a new key.');
-      } else {
-        toast('Error: '+msg,'err');
+      if (!isRateLimitError(msg)) { // rate limit already shown per-chunk above
+        if (msg.toLowerCase().includes('credit')||msg.toLowerCase().includes('billing')||msg.includes('402')) {
+          showApiError('No API credits','Your Anthropic API key has run out of credits.<br><br>Go to <strong>console.anthropic.com → Billing</strong> to add credits, then try again.');
+        } else if (msg.toLowerCase().includes('invalid')&&msg.toLowerCase().includes('api')) {
+          showApiError('Invalid API key','The API key in Setup is invalid or expired.<br><br>Go to <strong>console.anthropic.com → API Keys</strong> to generate a new key.');
+        } else {
+          toast('Error: '+msg,'err');
+        }
       }
     }
     console.error(err);
@@ -1179,11 +1375,20 @@ function renderReport(r) {
   document.getElementById('report-empty').style.display='none';
   document.getElementById('report-content').style.display='block';
 
-  // Meta
+  // Partial warning
+  const pw=document.getElementById('partial-warning');
+  if (r._partial) {
+    pw.style.display='block';
+    document.getElementById('partial-warning-text').textContent=
+      `${r._partial.completed} of ${r._partial.total} chunks analyzed`;
+  } else { pw.style.display='none'; }
+
+  // Meta — use client-side word count as authoritative
   const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
   const parts=[date];
   if (r.language||docInfo.language) parts.push(r.language||docInfo.language);
-  if (r.word_count||docInfo.wordCount) parts.push(`${(r.word_count||docInfo.wordCount).toLocaleString()} words`);
+  const wc = docInfo.wordCount || r.word_count;
+  if (wc) parts.push(`${wc.toLocaleString()} words`);
   if (docInfo.pages) parts.push(`${docInfo.pages} pages`);
   if (docInfo.filename) parts.push(docInfo.filename);
   document.getElementById('report-meta').textContent=parts.join(' · ');
