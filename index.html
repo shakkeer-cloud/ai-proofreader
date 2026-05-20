@@ -567,7 +567,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v2.6.0</span>
+  <span class="app-footer-version">v2.6.1</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1577,6 +1577,9 @@ function renderReport(r) {
     pw.style.display='none';
     const retryBtn = document.getElementById('partial-retry-btn');
     if (retryBtn) retryBtn.style.display = 'none';
+    // Also remove the interrupted-job banner if present — job is fully complete
+    const ib = document.getElementById('interrupted-banner');
+    if (ib) ib.remove();
   }
 
   // Meta — use client-side word count as authoritative
@@ -2283,38 +2286,51 @@ async function retryFailedChunks() {
       document.getElementById('loading-sub').textContent = `Sending to Claude… · ${newErrors.length} issues found`;
       document.getElementById('progress-bar').style.width = (30 + ((ci + 0.5) / chunks.length) * 60) + '%';
 
-      try {
-        const res = await callApiWithRetry({
-          model, max_tokens:8000, temperature:0, system:systemPrompt,
-          messages:[{role:'user', content:
-            `Proofread this text (part ${ci+1} of ${chunks.length}):\n\n${chunks[ci]}`}]
-        }, apiKey, ci+1, chunks.length, true);
-
-        const data = await res.json();
-        const chunk_report = parseClaudeJSON(data.content[0].text);
-        if (data.usage) { newInputTok += data.usage.input_tokens||0; newOutputTok += data.usage.output_tokens||0; }
-
-        const idOffset = newErrors.length;
-        const validErrors = (chunk_report.errors||[]).filter(e => !isFalsePositive(e));
-        validErrors.forEach((e, idx) => {
-          e.id = idOffset + idx + 1;
-          if (!e.page && docInfo.pageTexts.length)
-            e.page = findPage(e.original) || findPage(e.context);
-          newErrors.push(e);
-        });
-        completedNew++;
-
-      } catch(chunkErr) {
-        newPartialStart = ci + 1;
-        const msg = chunkErr.message||'';
-        if (isRateLimitError(msg)) {
-          showApiError('Rate limit reached',
-            `Rate limit hit on chunk ${ci+1}.<br><br>Wait 1–2 minutes and click <strong>Continue</strong> again.`);
-        } else {
-          toast(`Chunk ${ci+1} error: ${msg}`, 'err');
+      let chunkDone = false;
+      for (let parseAttempt = 0; parseAttempt < 3 && !chunkDone; parseAttempt++) {
+        if (parseAttempt > 0) {
+          document.getElementById('loading-title').textContent = `Chunk ${ci+1} — retrying (attempt ${parseAttempt+1}/3)`;
+          document.getElementById('loading-sub').textContent = `JSON parse failed — resending to Claude…`;
+          await new Promise(r => setTimeout(r, 3000));
         }
-        break;
+        try {
+          const res = await callApiWithRetry({
+            model, max_tokens:8000, temperature:0, system:systemPrompt,
+            messages:[{role:'user', content:
+              `Proofread this text (part ${ci+1} of ${chunks.length}):\n\n${chunks[ci]}`}]
+          }, apiKey, ci+1, chunks.length, true);
+
+          const data = await res.json();
+          const chunk_report = parseClaudeJSON(data.content[0].text);
+          if (data.usage) { newInputTok += data.usage.input_tokens||0; newOutputTok += data.usage.output_tokens||0; }
+
+          const idOffset = newErrors.length;
+          const validErrors = (chunk_report.errors||[]).filter(e => !isFalsePositive(e));
+          validErrors.forEach((e, idx) => {
+            e.id = idOffset + idx + 1;
+            if (!e.page && docInfo.pageTexts.length)
+              e.page = findPage(e.original) || findPage(e.context);
+            newErrors.push(e);
+          });
+          completedNew++;
+          chunkDone = true;
+
+        } catch(chunkErr) {
+          const msg = chunkErr.message||'';
+          const isJsonErr = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse') ||
+                            msg.toLowerCase().includes('incomplete');
+          if (isJsonErr && parseAttempt < 2) continue; // auto-retry parse errors
+          newPartialStart = ci + 1;
+          if (isRateLimitError(msg)) {
+            showApiError('Rate limit reached',
+              `Rate limit hit on chunk ${ci+1}.<br><br>Wait 1–2 minutes and click <strong>Continue</strong> again.`);
+          } else {
+            toast(`Chunk ${ci+1} error: ${msg}`, 'err');
+          }
+          break;
+        }
       }
+      if (!chunkDone) break;
     }
 
     // Dedup, re-ID, rebuild summary
