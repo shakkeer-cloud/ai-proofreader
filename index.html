@@ -1334,6 +1334,15 @@ Return ONLY valid JSON (no markdown, no extra text):
   ALL_TYPES.forEach(t => summaryTotals[t] = 0);
   let completedChunks = 0, partialFromChunk = -1, lastChunkErr = null;
 
+  // Mark job as in-progress so an interrupted run is detectable on next load
+  try {
+    localStorage.setItem('proof_in_progress', JSON.stringify({
+      filename: docInfo.filename || '(pasted text)',
+      startedAt: Date.now(),
+      totalChunks: chunks.length
+    }));
+  } catch(e) {}
+
   setProgressStage('analyzing');
   if (chunks.length > 1 && showOnDone) {
     document.getElementById('loading-sub').textContent =
@@ -1407,6 +1416,29 @@ Return ONLY valid JSON (no markdown, no extra text):
           });
           completedChunks++;
           chunkDone = true;
+
+          // Progressive save — preserve work after every chunk in case browser kills the tab
+          if (completedChunks < chunks.length) {
+            try {
+              const interimTotals = {};
+              ALL_TYPES.forEach(t => interimTotals[t] = 0);
+              allErrors.forEach(e => { if (interimTotals[e.type] !== undefined) interimTotals[e.type]++; });
+              const interimReport = {
+                language: detectedLang || docInfo.language,
+                word_count: docInfo.wordCount || totalWordCount,
+                summary: { total_errors: allErrors.length, ...interimTotals },
+                errors: [...allErrors],
+                _checks: selectedChecks.size > 0 ? [...selectedChecks] : null,
+                _inputTok: totalInputTok, _outputTok: totalOutputTok,
+                _model: model,
+                _cost: calcCost(model, totalInputTok, totalOutputTok),
+                _partial: { completed: completedChunks, total: chunks.length },
+              };
+              _retryState = { chunks, startChunkIdx: completedChunks, model, systemPrompt };
+              lastReport = interimReport;
+              saveLastReport(interimReport);
+            } catch(saveErr) { /* non-fatal */ }
+          }
 
         } catch(chunkErr) {
           const msg = chunkErr.message||'';
@@ -1513,6 +1545,8 @@ Return ONLY valid JSON (no markdown, no extra text):
     throw err;
   } finally {
     if (showOnDone) { setLoading(false); document.getElementById('loading-title').textContent='Analyzing document…'; }
+    // Clear in-progress marker — job is done (success or failure)
+    try { localStorage.removeItem('proof_in_progress'); } catch(e) {}
   }
 }
 
@@ -2351,9 +2385,25 @@ function saveLastReport(report) {
 }
 
 function loadSavedReport() {
+  // Check for an interrupted job — if proof_in_progress exists on load,
+  // the last run was killed by the browser before finishing.
+  let interruptedInfo = null;
+  try {
+    const ip = localStorage.getItem('proof_in_progress');
+    if (ip) {
+      interruptedInfo = JSON.parse(ip);
+      // Clear the stale marker — it will be set again if a new job starts
+      localStorage.removeItem('proof_in_progress');
+    }
+  } catch(e) {}
+
   try {
     const raw = localStorage.getItem('proof_last_report');
-    if (!raw) return;
+    if (!raw) {
+      // No saved report — if interrupted, show message on empty state
+      if (interruptedInfo) showInterruptedBanner(interruptedInfo, null);
+      return;
+    }
     const {report, di, ts, retryInfo} = JSON.parse(raw);
     if (Date.now() - ts > 24 * 3600 * 1000) return; // expire after 24 h
     lastReport = report;
@@ -2379,7 +2429,47 @@ function loadSavedReport() {
 
     renderReport(report);
     showTab('report');
+
+    // If the job was interrupted and the saved report is partial, show banner
+    if (interruptedInfo && report._partial) {
+      showInterruptedBanner(interruptedInfo, report._partial);
+    }
   } catch(e) {}
+}
+
+function showInterruptedBanner(ipInfo, partial) {
+  // Show a dismissible orange banner at the top of the report (or empty state)
+  const existing = document.getElementById('interrupted-banner');
+  if (existing) existing.remove();
+
+  const fname = ipInfo.filename ? `"${ipInfo.filename}"` : 'your document';
+  const when = ipInfo.startedAt ? (() => {
+    const mins = Math.round((Date.now() - ipInfo.startedAt) / 60000);
+    return mins < 2 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins/60)}h ago`;
+  })() : '';
+  const chunkInfo = partial
+    ? `${partial.completed} of ${partial.total} chunks were saved`
+    : (ipInfo.totalChunks > 1 ? `0 of ${ipInfo.totalChunks} chunks were saved` : 'No results were saved');
+
+  const banner = document.createElement('div');
+  banner.id = 'interrupted-banner';
+  banner.style.cssText = 'background:#f9731615;border:1px solid #f9731660;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#f97316;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+  banner.innerHTML =
+    `⚡ <strong>Interrupted job detected</strong> — A proofreading job on ${fname}${when?' started '+when:''} was interrupted (browser closed or tab killed). ${chunkInfo}.`+
+    (partial && partial.completed > 0
+      ? ` The partial results below were auto-saved. Use <strong>Continue</strong> to resume from chunk ${partial.completed + 1}.`
+      : ` No partial results were recovered — please re-run the proofreader.`)+
+    ` <button onclick="document.getElementById('interrupted-banner').remove()" style="margin-left:auto;background:#f9731622;border:1px solid #f9731660;border-radius:6px;color:#f97316;font-size:11px;font-weight:700;padding:3px 10px;cursor:pointer">Dismiss</button>`;
+
+  // Insert at top of report content (or before report-empty)
+  const target = document.getElementById('report-content');
+  const empty  = document.getElementById('report-empty');
+  if (target && target.style.display !== 'none') {
+    target.insertBefore(banner, target.firstChild);
+  } else if (empty) {
+    empty.parentNode.insertBefore(banner, empty);
+    showTab('report'); // switch to report tab so user sees the banner
+  }
 }
 
 // ══════════════════════════════════════════════
