@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proofreader Review · Explorer</title>
+  <style>
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --sf2:      #22263a;
+      --border:   #2a2d3a;
+      --text:     #e1e4f0;
+      --muted:    #8b8fa8;
+      --primary:  #6c63ff;
+      --ph:       #5b52ee;
+      --success:  #10b981;
+      --danger:   #ef4444;
+      --warning:  #f59e0b;
+      --info:     #3b82f6;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:14px; min-height:100vh; }
+
+    /* ── Layout ── */
+    .page { display:none; max-width:960px; margin:0 auto; padding:24px 16px 60px; }
+    .page.active { display:block; }
+
+    /* ── Header ── */
+    .app-header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; gap:16px; height:52px; position:sticky; top:0; z-index:50; }
+    .app-logo { font-size:15px; font-weight:700; color:var(--text); text-decoration:none; display:flex; align-items:center; gap:8px; }
+    .app-logo span { font-size:18px; }
+    .header-tabs { display:flex; gap:2px; margin-left:auto; }
+    .header-tab { background:none; border:none; color:var(--muted); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer; transition:all .15s; }
+    .header-tab.active, .header-tab:hover { background:var(--sf2); color:var(--text); }
+    .header-tab.active { color:var(--primary); }
+
+    /* ── Cards ── */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
+    .card h3 { font-size:14px; font-weight:700; margin-bottom:12px; }
+    .card .help { font-size:12px; color:var(--muted); line-height:1.6; margin-top:8px; }
+
+    /* ── Inputs ── */
+    input[type=text], input[type=password], input[type=email], textarea, select {
+      width:100%; background:var(--sf2); border:1px solid var(--border); border-radius:8px;
+      color:var(--text); font-size:13px; padding:9px 12px; outline:none; transition:border-color .15s;
+    }
+    input:focus, textarea:focus, select:focus { border-color:var(--primary); }
+    label { font-size:12px; font-weight:600; color:var(--muted); display:block; margin-bottom:5px; }
+
+    /* ── Buttons ── */
+    .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .15s; text-decoration:none; }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-primary:hover { background:var(--ph); }
+    .btn-secondary { background:var(--sf2); color:var(--text); border:1px solid var(--border); }
+    .btn-secondary:hover { background:var(--border); }
+    .btn-success { background:#10b98122; color:var(--success); border:1px solid #10b98140; }
+    .btn-success:hover { background:#10b98133; }
+    .btn-danger  { background:#ef444422; color:var(--danger);  border:1px solid #ef444440; }
+    .btn-danger:hover  { background:#ef444433; }
+    .btn-warn    { background:#f59e0b22; color:var(--warning); border:1px solid #f59e0b40; }
+    .btn-warn:hover    { background:#f59e0b33; }
+    .btn-sm { padding:5px 10px; font-size:12px; }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+
+    /* ── Badges ── */
+    .badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; text-transform:uppercase; letter-spacing:.03em; }
+    .badge-pending  { background:#f59e0b22; color:var(--warning); border:1px solid #f59e0b40; }
+    .badge-reviewed { background:#10b98122; color:var(--success); border:1px solid #10b98140; }
+
+    /* ── Toast ── */
+    #toast { position:fixed; bottom:20px; right:20px; padding:10px 16px; border-radius:10px; font-size:13px; font-weight:600; opacity:0; transform:translateY(8px); transition:all .25s; pointer-events:none; z-index:999; max-width:320px; }
+    #toast.show { opacity:1; transform:translateY(0); }
+    #toast.ok   { background:#10b981; color:#fff; }
+    #toast.warn { background:#f59e0b; color:#000; }
+    #toast.err  { background:#ef4444; color:#fff; }
+
+    /* ── Loading overlay ── */
+    #loading-overlay { display:none; position:fixed; inset:0; background:rgba(15,17,23,.85); backdrop-filter:blur(4px); z-index:200; align-items:center; justify-content:center; flex-direction:column; gap:12px; }
+    #loading-overlay.show { display:flex; }
+    .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    #loading-msg { font-size:14px; font-weight:600; color:var(--muted); }
+
+    /* ── Setup check banner ── */
+    .setup-banner { background:#6c63ff18; border:1px solid #6c63ff40; border-radius:10px; padding:14px 16px; margin-bottom:16px; font-size:13px; }
+    .setup-banner strong { color:var(--primary); }
+
+    /* ── Session list ── */
+    .session-item { background:var(--sf2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:12px; }
+    .session-item-info { flex:1; min-width:0; }
+    .session-item-title { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .session-item-meta  { font-size:11px; color:var(--muted); margin-top:3px; }
+    .session-item-actions { display:flex; gap:8px; flex-shrink:0; }
+    .empty-sessions { text-align:center; padding:32px; color:var(--muted); font-size:13px; }
+
+    /* ── Review page header ── */
+    .review-header { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
+    .review-header h2 { font-size:17px; font-weight:700; }
+    .review-header .meta { font-size:12px; color:var(--muted); margin-top:6px; line-height:1.7; }
+    .review-header .stats { display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; }
+    .stat-chip { background:var(--sf2); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; }
+    .stat-chip span { color:var(--muted); font-weight:400; }
+
+    /* ── Progress bar ── */
+    .review-progress { background:var(--sf2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; }
+    .progress-track { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+    .progress-fill  { height:100%; background:var(--primary); border-radius:3px; transition:width .3s; }
+    .progress-label { font-size:12px; color:var(--muted); white-space:nowrap; }
+
+    /* ── Filter bar ── */
+    .filter-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+    .filter-bar span { font-size:11px; color:var(--muted); margin-right:2px; }
+    .filt-btn { background:var(--sf2); border:1px solid var(--border); border-radius:6px; color:var(--muted); font-size:11px; font-weight:600; padding:4px 10px; cursor:pointer; transition:all .15s; }
+    .filt-btn.on { color:#fff; border-color:transparent; }
+    .filt-btn.decision-all.on  { background:#6c63ff; }
+    .filt-btn.decision-approved.on { background:var(--success); }
+    .filt-btn.decision-rejected.on { background:var(--danger); }
+    .filt-btn.decision-suggested.on { background:var(--warning); color:#000; }
+    .filt-btn.decision-pending.on  { background:var(--muted); }
+
+    /* ── Review table ── */
+    .table-wrap { overflow-x:auto; border-radius:10px; border:1px solid var(--border); }
+    table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; }
+    thead th { background:var(--sf2); color:var(--muted); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; }
+    tbody tr { border-bottom:1px solid var(--border); transition:background .1s; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr.hidden-row { display:none; }
+    tbody tr.decided-approved { background:#10b98108; }
+    tbody tr.decided-rejected { background:#ef444408; }
+    tbody tr.decided-suggested { background:#f59e0b08; }
+    td { padding:8px 10px; vertical-align:top; }
+
+    /* Column widths */
+    col.c-num  { width:32px; }
+    col.c-type { width:90px; }
+    col.c-pg   { width:36px; }
+    col.c-orig { width:17%; }
+    col.c-corr { width:17%; }
+    col.c-expl { width:auto; }
+    col.c-dec  { width:160px; }
+
+    .type-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; display:inline-block; white-space:nowrap; }
+    .sev-badge  { font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-top:3px; display:inline-block; }
+    .sev-Critical { background:#ef444422; color:var(--danger); }
+    .sev-Moderate { background:#f59e0b22; color:var(--warning); }
+    .sev-Minor    { background:#8b8fa822; color:var(--muted); }
+
+    .pg-num { font-size:11px; color:var(--muted); white-space:nowrap; }
+    .orig-text { color:#fca5a5; font-size:12px; line-height:1.5; word-break:break-word; }
+    .corr-text { color:#6ee7b7; font-size:12px; line-height:1.5; word-break:break-word; }
+    .expl-text { font-size:12px; color:var(--muted); line-height:1.5; word-break:break-word; }
+
+    /* Decision cell */
+    .dec-cell { display:flex; flex-direction:column; gap:5px; }
+    .dec-btns { display:flex; gap:4px; flex-wrap:wrap; }
+    .dec-btn { font-size:10px; font-weight:700; padding:3px 8px; border-radius:5px; cursor:pointer; border:1px solid; transition:all .15s; background:none; }
+    .dec-btn.approve { color:var(--success); border-color:#10b98140; }
+    .dec-btn.approve.selected { background:var(--success); color:#fff; border-color:var(--success); }
+    .dec-btn.reject  { color:var(--danger);  border-color:#ef444440; }
+    .dec-btn.reject.selected  { background:var(--danger);  color:#fff; border-color:var(--danger); }
+    .dec-btn.suggest { color:var(--warning); border-color:#f59e0b40; }
+    .dec-btn.suggest.selected { background:var(--warning); color:#000; border-color:var(--warning); }
+    .suggest-input { width:100%; font-size:11px; padding:4px 7px; border-radius:5px; background:var(--sf2); border:1px solid var(--border); color:var(--text); margin-top:2px; resize:none; display:none; }
+    .suggest-input.show { display:block; }
+
+    /* Decision display (results mode) */
+    .dec-label { font-size:11px; font-weight:700; padding:3px 8px; border-radius:5px; display:inline-block; }
+    .dec-approved  { background:#10b98122; color:var(--success); }
+    .dec-rejected  { background:#ef444422; color:var(--danger); }
+    .dec-suggested { background:#f59e0b22; color:var(--warning); }
+    .dec-pending   { background:var(--sf2); color:var(--muted); border:1px solid var(--border); }
+    .dec-suggestion-text { font-size:11px; color:var(--warning); margin-top:4px; font-style:italic; word-break:break-word; }
+
+    /* ── Reviewer name bar ── */
+    .reviewer-bar { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .reviewer-bar label { margin:0; white-space:nowrap; }
+    .reviewer-bar input { max-width:240px; flex:1; }
+
+    /* ── Submit bar ── */
+    .submit-bar { position:sticky; bottom:0; background:var(--bg); border-top:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }
+    .submit-bar .summary { font-size:12px; color:var(--muted); flex:1; }
+
+    /* ── Results header ── */
+    .results-summary { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .results-stat { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 16px; flex:1; min-width:120px; text-align:center; }
+    .results-stat .num { font-size:22px; font-weight:800; }
+    .results-stat .lbl { font-size:11px; color:var(--muted); margin-top:2px; }
+    .results-approved  .num { color:var(--success); }
+    .results-rejected  .num { color:var(--danger); }
+    .results-suggested .num { color:var(--warning); }
+    .results-pending   .num { color:var(--muted); }
+
+    /* ── Footer ── */
+    .app-footer { text-align:center; font-size:11px; color:var(--muted); padding:20px; opacity:.6; }
+
+    /* ── Copied link display ── */
+    .link-box { background:var(--sf2); border:1px solid var(--primary); border-radius:8px; padding:10px 12px; font-size:12px; font-family:monospace; word-break:break-all; color:var(--primary); margin-top:10px; cursor:pointer; position:relative; }
+    .link-box::after { content:'Click to copy'; position:absolute; top:4px; right:8px; font-size:10px; color:var(--muted); font-family:inherit; }
+
+    /* ── Supabase setup instructions ── */
+    .sql-block { background:#0a0c14; border:1px solid var(--border); border-radius:8px; padding:12px 14px; font-family:monospace; font-size:11px; color:#a5b4fc; line-height:1.7; white-space:pre-wrap; word-break:break-all; margin-top:8px; overflow-x:auto; }
+    .step-list { counter-reset:steps; }
+    .step-list li { counter-increment:steps; padding:6px 0 6px 28px; position:relative; font-size:13px; line-height:1.5; color:var(--text); }
+    .step-list li::before { content:counter(steps); position:absolute; left:0; top:6px; background:var(--primary); color:#fff; width:18px; height:18px; border-radius:50%; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+
+    .sep { height:1px; background:var(--border); margin:16px 0; }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div id="loading-msg">Loading…</div>
+</div>
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- HEADER                                         -->
+<!-- ═══════════════════════════════════════════════ -->
+<header class="app-header" id="app-header">
+  <a class="app-logo" href="index.html">
+    <span>📝</span> Proofreader Review
+  </a>
+  <div class="header-tabs" id="header-tabs" style="display:none">
+    <button class="header-tab active" onclick="showPage('dashboard')" id="tab-dashboard">Dashboard</button>
+    <button class="header-tab" onclick="showPage('setup')" id="tab-setup">Setup</button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- DASHBOARD PAGE (initiator)                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="page active" id="dashboard-page">
+
+  <div id="config-banner" class="setup-banner" style="display:none">
+    ⚙️ <strong>Setup required</strong> — Go to <strong>Setup</strong> tab to enter your Supabase credentials before creating review sessions.
+  </div>
+
+  <!-- Create review -->
+  <div class="card">
+    <h3>📤 Create New Review Session</h3>
+    <p class="help">Export a report as JSON from the proofreader app, then import it here to create a shareable review link.</p>
+    <div style="margin-top:14px">
+      <label>Import report JSON</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+        <input type="file" id="json-file-input" accept=".json" style="display:none" onchange="handleJSONFile(this)">
+        <button class="btn btn-secondary" onclick="document.getElementById('json-file-input').click()">
+          📂 Choose JSON file
+        </button>
+        <span id="json-file-name" style="font-size:12px;color:var(--muted)">No file selected</span>
+      </div>
+    </div>
+    <div id="json-preview" style="display:none;margin-top:14px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.8">
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <button class="btn btn-primary" id="create-btn" onclick="createSession()" disabled>
+        🔗 Create Review Link
+      </button>
+    </div>
+    <div id="created-link-box" style="display:none;margin-top:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--success);margin-bottom:6px">✓ Review session created! Share this link:</div>
+      <div class="link-box" id="created-link" onclick="copyLink(this)"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Link expires in 30 days · Click the link to copy it</div>
+    </div>
+  </div>
+
+  <!-- My sessions -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="margin-bottom:0">📋 My Review Sessions</h3>
+      <button class="btn btn-secondary btn-sm" onclick="refreshSessions()">↻ Refresh</button>
+    </div>
+    <div id="sessions-list"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SETUP PAGE                                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="page" id="setup-page">
+
+  <div class="card">
+    <h3>⚙️ Supabase Configuration</h3>
+    <p class="help">One-time setup. Create a free account at <strong>supabase.com</strong>, then follow the steps below.</p>
+
+    <div style="margin-top:16px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">Step 1 — Create the database table</div>
+      <p class="help">In your Supabase project, go to <strong>SQL Editor</strong> and run this SQL:</p>
+      <div class="sql-block">create table public.review_sessions (
+  id text primary key,
+  report jsonb not null,
+  doc_name text,
+  initiated_by text,
+  model_name text,
+  created_at timestamptz default now(),
+  expires_at timestamptz default (now() + interval '30 days'),
+  status text default 'pending',
+  reviewed_by text,
+  reviewed_at timestamptz,
+  decisions jsonb default '{}'::jsonb
+);
+alter table public.review_sessions enable row level security;
+create policy "anon_read"   on public.review_sessions for select using (true);
+create policy "anon_insert" on public.review_sessions for insert with check (true);
+create policy "anon_update" on public.review_sessions for update using (status = 'pending') with check (true);</div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="copySQL()">📋 Copy SQL</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">Step 2 — Get your credentials</div>
+    <p class="help">In your Supabase project go to <strong>Settings → API</strong>. Copy the <strong>Project URL</strong> and the <strong>anon public</strong> key.</p>
+
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+      <div>
+        <label>Supabase Project URL</label>
+        <input type="text" id="sb-url-input" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off">
+      </div>
+      <div>
+        <label>Supabase Anon Key (public)</label>
+        <input type="password" id="sb-key-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" autocomplete="off">
+      </div>
+      <div>
+        <label>Your Name</label>
+        <input type="text" id="sb-name-input" placeholder="e.g. Shakkeer" autocomplete="off">
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
+      <button class="btn btn-primary" onclick="saveSetup()">Save Configuration</button>
+      <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- REVIEW PAGE (reviewer — loaded via ?session=ID) -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="page" id="review-page">
+  <div id="review-header-box"></div>
+
+  <!-- Reviewer name (only in review mode, not results) -->
+  <div class="reviewer-bar" id="reviewer-bar">
+    <label>Your name:</label>
+    <input type="text" id="reviewer-name-input" placeholder="Enter your name before submitting…">
+  </div>
+
+  <!-- Progress -->
+  <div class="review-progress" id="review-progress">
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <div class="progress-label" id="progress-label">0 / 0 reviewed</div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar" id="review-filter-bar">
+    <span>FILTER:</span>
+    <button class="filt-btn decision-all on" onclick="setDecisionFilter('all',this)">All</button>
+    <button class="filt-btn decision-approved" onclick="setDecisionFilter('approved',this)">✓ Approved</button>
+    <button class="filt-btn decision-rejected" onclick="setDecisionFilter('rejected',this)">✗ Rejected</button>
+    <button class="filt-btn decision-suggested" onclick="setDecisionFilter('suggested',this)">✎ Suggestions</button>
+    <button class="filt-btn decision-pending"  onclick="setDecisionFilter('pending',this)">Undecided</button>
+  </div>
+
+  <!-- Error table -->
+  <div class="table-wrap">
+    <table>
+      <colgroup>
+        <col class="c-num"><col class="c-type"><col class="c-pg">
+        <col class="c-orig"><col class="c-corr"><col class="c-expl"><col class="c-dec">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>#</th><th>Type</th><th>Pg</th>
+          <th>Original</th><th>Corrected</th><th>Explanation</th>
+          <th id="dec-th">Decision</th>
+        </tr>
+      </thead>
+      <tbody id="review-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Submit bar -->
+  <div class="submit-bar" id="submit-bar">
+    <div class="summary" id="submit-summary"></div>
+    <button class="btn btn-primary" id="submit-btn" onclick="submitReview()">Submit Review</button>
+  </div>
+
+  <!-- Results export bar (shown in results mode) -->
+  <div class="submit-bar" id="results-bar" style="display:none">
+    <div class="summary" id="results-summary-text"></div>
+    <button class="btn btn-success" onclick="exportApproved()">⬇ Export Approved Changes</button>
+    <button class="btn btn-secondary" onclick="exportFullResults()">⬇ Export Full Results</button>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- FOOTER                                         -->
+<!-- ═══════════════════════════════════════════════ -->
+<footer class="app-footer">
+  © 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved &nbsp;·&nbsp; v1.0.0
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════
+// Config & state
+// ═══════════════════════════════════════════════
+const TYPE_COLORS = {
+  Typos:'#ef4444', Spelling:'#f97316', Grammar:'#f59e0b',
+  Punctuation:'#10b981', Capitalization:'#3b82f6',
+  Style:'#8b5cf6', Consistency:'#06b6d4', Clarity:'#ec4899'
+};
+
+let _sbUrl  = '';
+let _sbKey  = '';
+let _myName = '';
+let _importedReport = null; // report JSON loaded from file
+let _sessionData    = null; // session loaded from Supabase for review
+let _decisions      = {};   // {errorId: {decision, suggestion}}
+let _decisionFilter = 'all';
+let _isResultsMode  = false;
+let _sessionId      = null;
+
+function cfg() { return { sbUrl: _sbUrl, sbKey: _sbKey, myName: _myName }; }
+function isConfigured() { return _sbUrl && _sbKey; }
+
+// ═══════════════════════════════════════════════
+// Supabase REST API
+// ═══════════════════════════════════════════════
+async function sbInsert(table, row) {
+  const res = await fetch(`${_sbUrl}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': _sbKey,
+      'Authorization': `Bearer ${_sbKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) throw new Error(`Supabase insert error: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+async function sbSelect(table, id) {
+  const res = await fetch(`${_sbUrl}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&select=*`, {
+    headers: { 'apikey': _sbKey, 'Authorization': `Bearer ${_sbKey}` }
+  });
+  if (!res.ok) throw new Error(`Supabase fetch error: ${res.status}`);
+  const rows = await res.json();
+  return rows[0] || null;
+}
+
+async function sbPatch(table, id, data) {
+  const res = await fetch(`${_sbUrl}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': _sbKey,
+      'Authorization': `Bearer ${_sbKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`Supabase update error: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════════
+function genId() {
+  return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function setLoading(on, msg = 'Loading…') {
+  document.getElementById('loading-overlay').classList.toggle('show', on);
+  document.getElementById('loading-msg').textContent = msg;
+}
+
+function showPage(name) {
+  ['dashboard', 'setup', 'review'].forEach(p => {
+    document.getElementById(p + '-page').classList.toggle('active', p === name);
+  });
+  document.querySelectorAll('.header-tab').forEach(b => b.classList.remove('active'));
+  const active = document.getElementById('tab-' + name);
+  if (active) active.classList.add('active');
+}
+
+function dlBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function saveSessionToLocal(id, docName, initiatedBy, createdAt) {
+  try {
+    const list = JSON.parse(localStorage.getItem('review_sessions') || '[]');
+    if (!list.find(s => s.id === id)) {
+      list.unshift({ id, docName, initiatedBy, createdAt, status: 'pending' });
+      localStorage.setItem('review_sessions', JSON.stringify(list.slice(0, 50)));
+    }
+  } catch(e) {}
+}
+
+function getLocalSessions() {
+  try { return JSON.parse(localStorage.getItem('review_sessions') || '[]'); }
+  catch(e) { return []; }
+}
+
+// ═══════════════════════════════════════════════
+// Setup
+// ═══════════════════════════════════════════════
+function saveSetup() {
+  const url  = document.getElementById('sb-url-input').value.trim().replace(/\/$/, '');
+  const key  = document.getElementById('sb-key-input').value.trim();
+  const name = document.getElementById('sb-name-input').value.trim();
+  if (!url || !key) { toast('Please enter both URL and key.', 'warn'); return; }
+  _sbUrl  = url;
+  _sbKey  = key;
+  _myName = name;
+  localStorage.setItem('review_sb_url',  url);
+  localStorage.setItem('review_sb_key',  key);
+  localStorage.setItem('review_sb_name', name);
+  toast('Configuration saved!');
+  showPage('dashboard');
+  checkConfig();
+}
+
+async function testConnection() {
+  const url = document.getElementById('sb-url-input').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('sb-key-input').value.trim();
+  if (!url || !key) { toast('Enter URL and key first.', 'warn'); return; }
+  setLoading(true, 'Testing connection…');
+  try {
+    const res = await fetch(`${url}/rest/v1/review_sessions?limit=1`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    });
+    if (res.status === 200 || res.status === 206) {
+      toast('✓ Connection successful!');
+    } else if (res.status === 404) {
+      toast('Table not found — did you run the SQL setup?', 'warn');
+    } else {
+      toast(`Error ${res.status} — check URL and key.`, 'err');
+    }
+  } catch(e) {
+    toast('Connection failed: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function copySQL() {
+  const sql = document.querySelector('.sql-block').textContent;
+  navigator.clipboard.writeText(sql).then(() => toast('SQL copied!')).catch(() => toast('Copy failed','err'));
+}
+
+function checkConfig() {
+  const banner = document.getElementById('config-banner');
+  if (banner) banner.style.display = isConfigured() ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════════
+// JSON file import
+// ═══════════════════════════════════════════════
+function handleJSONFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('json-file-name').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.errors || !Array.isArray(data.errors)) {
+        toast('Invalid report JSON — missing errors array.', 'err');
+        return;
+      }
+      _importedReport = data;
+      const preview = document.getElementById('json-preview');
+      const docName = data._doc_name || file.name.replace('-review.json','').replace('.json','');
+      const initiatedBy = data._initiated_by || '—';
+      const errCount = data.errors.length;
+      const lang = data.language || '—';
+      const model = data._model ? data._model.replace('claude-','Claude ') : '—';
+      preview.innerHTML = `
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Document</div><div style="font-weight:600;margin-top:2px">${esc(docName)}</div></div>
+          <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Initiated By</div><div style="font-weight:600;margin-top:2px">${esc(initiatedBy)}</div></div>
+          <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Language</div><div style="font-weight:600;margin-top:2px">${esc(lang)}</div></div>
+          <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Issues Found</div><div style="font-weight:600;color:var(--warning);margin-top:2px">${errCount}</div></div>
+          <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">AI Model</div><div style="font-weight:600;margin-top:2px">${esc(model)}</div></div>
+        </div>`;
+      preview.style.display = 'block';
+      document.getElementById('create-btn').disabled = false;
+    } catch(err) {
+      toast('Could not parse JSON file.', 'err');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════
+// Create review session
+// ═══════════════════════════════════════════════
+async function createSession() {
+  if (!isConfigured()) { toast('Configure Supabase in Setup tab first.', 'warn'); showPage('setup'); return; }
+  if (!_importedReport) { toast('Import a report JSON first.', 'warn'); return; }
+
+  setLoading(true, 'Creating review session…');
+  try {
+    const id = genId();
+    const docName = _importedReport._doc_name || 'Untitled';
+    const initiatedBy = _importedReport._initiated_by || _myName || '';
+    const modelName   = _importedReport._model || '';
+    const expiresAt   = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+
+    await sbInsert('review_sessions', {
+      id, report: _importedReport, doc_name: docName,
+      initiated_by: initiatedBy, model_name: modelName, expires_at: expiresAt
+    });
+
+    const link = `${location.origin}${location.pathname}?session=${id}`;
+    const linkEl = document.getElementById('created-link');
+    linkEl.textContent = link;
+    linkEl.dataset.link = link;
+    document.getElementById('created-link-box').style.display = 'block';
+
+    saveSessionToLocal(id, docName, initiatedBy, new Date().toISOString());
+    renderSessionList();
+    toast('Review session created!');
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function copyLink(el) {
+  const link = el.dataset.link || el.textContent;
+  navigator.clipboard.writeText(link).then(() => toast('Link copied!')).catch(() => toast('Copy failed','err'));
+}
+
+// ═══════════════════════════════════════════════
+// Session list (dashboard)
+// ═══════════════════════════════════════════════
+async function refreshSessions() {
+  const sessions = getLocalSessions();
+  if (!sessions.length || !isConfigured()) { renderSessionList(); return; }
+  setLoading(true, 'Refreshing…');
+  try {
+    for (const s of sessions) {
+      try {
+        const row = await sbSelect('review_sessions', s.id);
+        if (row) s.status = row.status;
+      } catch(e) { /* ignore individual fetch errors */ }
+    }
+    localStorage.setItem('review_sessions', JSON.stringify(sessions));
+    renderSessionList();
+    toast('Refreshed!');
+  } catch(e) {
+    toast('Refresh error: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderSessionList() {
+  const sessions = getLocalSessions();
+  const el = document.getElementById('sessions-list');
+  if (!sessions.length) {
+    el.innerHTML = '<div class="empty-sessions">No review sessions yet.<br>Create one above after exporting a report as JSON.</div>';
+    return;
+  }
+  el.innerHTML = sessions.map(s => `
+    <div class="session-item">
+      <div class="session-item-info">
+        <div class="session-item-title">${esc(s.docName || 'Untitled')}</div>
+        <div class="session-item-meta">
+          ${s.initiatedBy ? `By ${esc(s.initiatedBy)} · ` : ''}${fmtDate(s.createdAt)} · ID: ${s.id}
+        </div>
+      </div>
+      <div class="session-item-actions">
+        <span class="badge ${s.status === 'reviewed' ? 'badge-reviewed' : 'badge-pending'}">
+          ${s.status === 'reviewed' ? '✓ Reviewed' : 'Pending'}
+        </span>
+        <button class="btn btn-secondary btn-sm" onclick="openSession('${s.id}')">Open →</button>
+        <button class="btn btn-secondary btn-sm" onclick="copySessionLink('${s.id}')" title="Copy link">🔗</button>
+      </div>
+    </div>`).join('');
+}
+
+function copySessionLink(id) {
+  const link = `${location.origin}${location.pathname}?session=${id}`;
+  navigator.clipboard.writeText(link).then(() => toast('Link copied!')).catch(() => toast('Copy failed','err'));
+}
+
+function openSession(id) {
+  window.location.search = `?session=${id}`;
+}
+
+// ═══════════════════════════════════════════════
+// Load review session (reviewer mode)
+// ═══════════════════════════════════════════════
+async function loadReviewSession(id) {
+  setLoading(true, 'Loading review session…');
+  try {
+    // Use public read — pass key only if we have it configured
+    const headers = {};
+    if (_sbKey) { headers['apikey'] = _sbKey; headers['Authorization'] = `Bearer ${_sbKey}`; }
+
+    // We need the key to read — if not configured, show setup prompt
+    if (!isConfigured()) {
+      // Reviewer may not have config — show a prompt to enter the Supabase key
+      setLoading(false);
+      showReviewerSetupPrompt(id);
+      return;
+    }
+
+    const row = await sbSelect('review_sessions', id);
+    if (!row) { toast('Session not found or expired.', 'err'); setLoading(false); return; }
+
+    _sessionData = row;
+    _sessionId   = id;
+    _isResultsMode = (row.status === 'reviewed');
+
+    // Pre-fill decisions if already reviewed
+    if (_isResultsMode && row.decisions) {
+      _decisions = typeof row.decisions === 'string'
+        ? JSON.parse(row.decisions) : row.decisions;
+    } else {
+      _decisions = {};
+    }
+
+    renderReviewPage();
+  } catch(e) {
+    toast('Error loading session: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function showReviewerSetupPrompt(sessionId) {
+  // Reviewer needs to enter Supabase credentials to read the session
+  document.getElementById('header-tabs').style.display = 'none';
+  const page = document.getElementById('review-page');
+  page.innerHTML = `
+    <div class="card" style="max-width:480px;margin:40px auto">
+      <h3>🔑 Enter Supabase credentials to view this review</h3>
+      <p class="help" style="margin-bottom:14px">The review host will provide you with the Supabase URL and anon key. These are saved locally in your browser.</p>
+      <label>Supabase Project URL</label>
+      <input type="text" id="rv-url" placeholder="https://xxxx.supabase.co" style="margin-bottom:10px">
+      <label>Supabase Anon Key</label>
+      <input type="password" id="rv-key" placeholder="eyJ…" style="margin-bottom:14px">
+      <button class="btn btn-primary" onclick="saveReviewerConfig('${sessionId}')">Load Review</button>
+    </div>`;
+  page.classList.add('active');
+}
+
+async function saveReviewerConfig(sessionId) {
+  const url = document.getElementById('rv-url')?.value.trim().replace(/\/$/, '');
+  const key = document.getElementById('rv-key')?.value.trim();
+  if (!url || !key) { toast('Enter both URL and key.', 'warn'); return; }
+  _sbUrl = url; _sbKey = key;
+  localStorage.setItem('review_sb_url', url);
+  localStorage.setItem('review_sb_key', key);
+  // Re-render review page structure
+  document.getElementById('review-page').innerHTML = `
+    <div id="review-header-box"></div>
+    <div class="reviewer-bar" id="reviewer-bar">
+      <label>Your name:</label>
+      <input type="text" id="reviewer-name-input" placeholder="Enter your name before submitting…">
+    </div>
+    <div class="review-progress" id="review-progress">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="progress-label">0 / 0 reviewed</div>
+    </div>
+    <div class="filter-bar" id="review-filter-bar">
+      <span>FILTER:</span>
+      <button class="filt-btn decision-all on" onclick="setDecisionFilter('all',this)">All</button>
+      <button class="filt-btn decision-approved" onclick="setDecisionFilter('approved',this)">✓ Approved</button>
+      <button class="filt-btn decision-rejected" onclick="setDecisionFilter('rejected',this)">✗ Rejected</button>
+      <button class="filt-btn decision-suggested" onclick="setDecisionFilter('suggested',this)">✎ Suggestions</button>
+      <button class="filt-btn decision-pending"  onclick="setDecisionFilter('pending',this)">Undecided</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <colgroup><col class="c-num"><col class="c-type"><col class="c-pg"><col class="c-orig"><col class="c-corr"><col class="c-expl"><col class="c-dec"></colgroup>
+        <thead><tr><th>#</th><th>Type</th><th>Pg</th><th>Original</th><th>Corrected</th><th>Explanation</th><th id="dec-th">Decision</th></tr></thead>
+        <tbody id="review-tbody"></tbody>
+      </table>
+    </div>
+    <div class="submit-bar" id="submit-bar"><div class="summary" id="submit-summary"></div><button class="btn btn-primary" id="submit-btn" onclick="submitReview()">Submit Review</button></div>
+    <div class="submit-bar" id="results-bar" style="display:none"><div class="summary" id="results-summary-text"></div><button class="btn btn-success" onclick="exportApproved()">⬇ Export Approved Changes</button><button class="btn btn-secondary" onclick="exportFullResults()">⬇ Export Full Results</button></div>`;
+  await loadReviewSession(sessionId);
+}
+
+// ═══════════════════════════════════════════════
+// Render review page
+// ═══════════════════════════════════════════════
+function renderReviewPage() {
+  const s = _sessionData;
+  const report = s.report;
+  const errors = report.errors || [];
+
+  // Header
+  const totalErrors = errors.length;
+  document.getElementById('review-header-box').innerHTML = `
+    <div class="review-header">
+      <h2>📋 ${esc(s.doc_name || 'Proofreading Review')}</h2>
+      <div class="meta">
+        ${s.initiated_by ? `Initiated by <strong>${esc(s.initiated_by)}</strong> · ` : ''}
+        ${fmtDate(s.created_at)}
+        ${s.model_name ? ` · ${esc(s.model_name.replace('claude-','Claude '))}` : ''}
+        ${report.language ? ` · ${esc(report.language)}` : ''}
+        ${_isResultsMode ? ` · <span style="color:var(--success)">✓ Reviewed by <strong>${esc(s.reviewed_by)}</strong> on ${fmtDate(s.reviewed_at)}</span>` : ''}
+      </div>
+      <div class="stats">
+        <div class="stat-chip">${totalErrors} <span>issues</span></div>
+        ${Object.entries(report.summary || {})
+          .filter(([k,v]) => k !== 'total_errors' && v > 0)
+          .map(([k,v]) => `<div class="stat-chip" style="color:${TYPE_COLORS[k]||'inherit'}">${v} <span>${k}</span></div>`)
+          .join('')}
+      </div>
+    </div>`;
+
+  // Show/hide UI elements based on mode
+  document.getElementById('reviewer-bar').style.display = _isResultsMode ? 'none' : 'flex';
+  document.getElementById('submit-bar').style.display    = _isResultsMode ? 'none' : 'flex';
+  document.getElementById('results-bar').style.display   = _isResultsMode ? 'flex' : 'none';
+
+  // Column header
+  const decTh = document.getElementById('dec-th');
+  if (decTh) decTh.textContent = _isResultsMode ? 'Decision' : 'Your Decision';
+
+  // Build table rows
+  const tbody = document.getElementById('review-tbody');
+  tbody.innerHTML = errors.map(e => buildRow(e)).join('');
+
+  updateProgress();
+  if (_isResultsMode) renderResultsSummary();
+  showPage('review');
+}
+
+function buildRow(e) {
+  const color = TYPE_COLORS[e.type] || '#8b8fa8';
+  const dec   = _decisions[String(e.id)];
+  const decClass = dec ? `decided-${dec.decision}` : '';
+
+  const typeCell = `<div class="type-badge" style="background:${color}22;color:${color}">${esc(e.type)}</div>
+    <div class="sev-badge sev-${e.severity||'Minor'}">${e.severity||'Minor'}</div>`;
+
+  if (_isResultsMode) {
+    // Results mode — read-only decisions
+    let decHtml = '<span class="dec-label dec-pending">No decision</span>';
+    if (dec) {
+      if (dec.decision === 'approved')  decHtml = '<span class="dec-label dec-approved">✓ Approved</span>';
+      if (dec.decision === 'rejected')  decHtml = '<span class="dec-label dec-rejected">✗ Rejected</span>';
+      if (dec.decision === 'suggested') decHtml =
+        `<span class="dec-label dec-suggested">✎ Suggestion</span>
+         <div class="dec-suggestion-text">${esc(dec.suggestion || '')}</div>`;
+    }
+    return `<tr class="${decClass}" data-id="${e.id}" data-dec="${dec?.decision||'pending'}">
+      <td style="color:var(--muted);font-size:11px">${e.id}</td>
+      <td>${typeCell}</td>
+      <td class="pg-num">${e.page ? 'p.'+e.page : '—'}</td>
+      <td class="orig-text">${esc(e.original)}</td>
+      <td class="corr-text">${esc(e.corrected)}</td>
+      <td class="expl-text">${esc(e.explanation)}</td>
+      <td>${decHtml}</td>
+    </tr>`;
+  }
+
+  // Review mode — interactive decision buttons
+  const selectedDec = dec?.decision || null;
+  const suggestVal  = dec?.suggestion || '';
+  return `<tr class="${decClass}" data-id="${e.id}" data-dec="${selectedDec||'pending'}">
+    <td style="color:var(--muted);font-size:11px">${e.id}</td>
+    <td>${typeCell}</td>
+    <td class="pg-num">${e.page ? 'p.'+e.page : '—'}</td>
+    <td class="orig-text">${esc(e.original)}</td>
+    <td class="corr-text">${esc(e.corrected)}</td>
+    <td class="expl-text">${esc(e.explanation)}</td>
+    <td>
+      <div class="dec-cell">
+        <div class="dec-btns">
+          <button class="dec-btn approve ${selectedDec==='approved'?'selected':''}"
+            onclick="setDecision(${e.id},'approved',this)">✓ Approve</button>
+          <button class="dec-btn reject ${selectedDec==='rejected'?'selected':''}"
+            onclick="setDecision(${e.id},'rejected',this)">✗ Reject</button>
+          <button class="dec-btn suggest ${selectedDec==='suggested'?'selected':''}"
+            onclick="setDecision(${e.id},'suggested',this)">✎ Suggest</button>
+        </div>
+        <textarea class="suggest-input ${selectedDec==='suggested'?'show':''}"
+          id="sug-${e.id}" rows="2"
+          placeholder="Enter alternative correction…"
+          onchange="updateSuggestion(${e.id},this.value)"
+          onblur="updateSuggestion(${e.id},this.value)"
+        >${esc(suggestVal)}</textarea>
+      </div>
+    </td>
+  </tr>`;
+}
+
+// ═══════════════════════════════════════════════
+// Decision interactions
+// ═══════════════════════════════════════════════
+function setDecision(errorId, decision, btn) {
+  const id = String(errorId);
+  const row = document.querySelector(`tr[data-id="${errorId}"]`);
+  const allBtns = row.querySelectorAll('.dec-btn');
+  const sugInput = document.getElementById(`sug-${errorId}`);
+
+  // Toggle off if already selected
+  if (_decisions[id]?.decision === decision) {
+    delete _decisions[id];
+    allBtns.forEach(b => b.classList.remove('selected'));
+    row.className = '';
+    row.dataset.dec = 'pending';
+    if (sugInput) sugInput.classList.remove('show');
+    updateProgress();
+    applyDecisionFilter();
+    return;
+  }
+
+  // Set new decision
+  _decisions[id] = { decision, suggestion: sugInput?.value || '' };
+  allBtns.forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  row.className = `decided-${decision}`;
+  row.dataset.dec = decision;
+
+  // Show/hide suggestion text area
+  if (sugInput) sugInput.classList.toggle('show', decision === 'suggested');
+
+  updateProgress();
+  applyDecisionFilter();
+}
+
+function updateSuggestion(errorId, value) {
+  const id = String(errorId);
+  if (_decisions[id]) {
+    _decisions[id].suggestion = value;
+  }
+}
+
+function updateProgress() {
+  const report = _sessionData?.report;
+  if (!report) return;
+  const total   = (report.errors || []).length;
+  const decided = Object.keys(_decisions).length;
+  const pct     = total ? Math.round(decided / total * 100) : 0;
+
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('progress-label');
+  if (fill)  fill.style.width = pct + '%';
+  if (label) label.textContent = `${decided} / ${total} reviewed`;
+
+  // Update submit button
+  const submitBtn = document.getElementById('submit-btn');
+  const summary   = document.getElementById('submit-summary');
+  if (submitBtn) {
+    const approved  = Object.values(_decisions).filter(d => d.decision === 'approved').length;
+    const rejected  = Object.values(_decisions).filter(d => d.decision === 'rejected').length;
+    const suggested = Object.values(_decisions).filter(d => d.decision === 'suggested').length;
+    if (summary) summary.textContent =
+      `${approved} approved · ${rejected} rejected · ${suggested} suggestions · ${total - decided} undecided`;
+    submitBtn.disabled = decided === 0;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Filter
+// ═══════════════════════════════════════════════
+function setDecisionFilter(filter, btn) {
+  _decisionFilter = filter;
+  document.querySelectorAll('.filt-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  applyDecisionFilter();
+}
+
+function applyDecisionFilter() {
+  document.querySelectorAll('#review-tbody tr').forEach(row => {
+    const dec = row.dataset.dec || 'pending';
+    const visible = _decisionFilter === 'all' || dec === _decisionFilter;
+    row.classList.toggle('hidden-row', !visible);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// Submit review
+// ═══════════════════════════════════════════════
+async function submitReview() {
+  const reviewerName = document.getElementById('reviewer-name-input')?.value.trim();
+  if (!reviewerName) { toast('Please enter your name before submitting.', 'warn'); return; }
+  if (Object.keys(_decisions).length === 0) { toast('Make at least one decision before submitting.', 'warn'); return; }
+
+  const confirmed = confirm(
+    `Submit your review as "${reviewerName}"?\n\n` +
+    `Decisions made: ${Object.keys(_decisions).length} of ${(_sessionData.report.errors||[]).length} errors\n\n` +
+    `Once submitted, the review cannot be changed.`
+  );
+  if (!confirmed) return;
+
+  setLoading(true, 'Submitting review…');
+  try {
+    await sbPatch('review_sessions', _sessionId, {
+      status: 'reviewed',
+      reviewed_by: reviewerName,
+      reviewed_at: new Date().toISOString(),
+      decisions: _decisions
+    });
+
+    // Update local session status
+    const sessions = getLocalSessions();
+    const s = sessions.find(x => x.id === _sessionId);
+    if (s) { s.status = 'reviewed'; localStorage.setItem('review_sessions', JSON.stringify(sessions)); }
+
+    toast('Review submitted! Thank you.');
+    _isResultsMode = true;
+    _sessionData.status = 'reviewed';
+    _sessionData.reviewed_by = reviewerName;
+    _sessionData.reviewed_at = new Date().toISOString();
+    _sessionData.decisions = _decisions;
+    renderReviewPage();
+  } catch(e) {
+    toast('Submit error: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Results summary
+// ═══════════════════════════════════════════════
+function renderResultsSummary() {
+  const total     = (_sessionData.report.errors || []).length;
+  const approved  = Object.values(_decisions).filter(d => d.decision === 'approved').length;
+  const rejected  = Object.values(_decisions).filter(d => d.decision === 'rejected').length;
+  const suggested = Object.values(_decisions).filter(d => d.decision === 'suggested').length;
+  const pending   = total - approved - rejected - suggested;
+
+  const summaryText = document.getElementById('results-summary-text');
+  if (summaryText) {
+    summaryText.innerHTML =
+      `<strong style="color:var(--success)">${approved} approved</strong> · ` +
+      `<strong style="color:var(--danger)">${rejected} rejected</strong> · ` +
+      `<strong style="color:var(--warning)">${suggested} suggestions</strong>` +
+      (pending > 0 ? ` · ${pending} no decision` : '');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Export (results mode)
+// ═══════════════════════════════════════════════
+function exportApproved() {
+  const s = _sessionData;
+  const errors = (s.report.errors || []).filter(e => {
+    const d = _decisions[String(e.id)];
+    return d && (d.decision === 'approved' || d.decision === 'suggested');
+  });
+
+  const rows = errors.map(e => {
+    const d = _decisions[String(e.id)];
+    const finalCorr = d.decision === 'suggested' ? d.suggestion : e.corrected;
+    return `| ${e.id} | ${e.type} | p.${e.page||'?'} | ${e.original} | ${finalCorr} | ${e.explanation} |`;
+  });
+
+  const text = [
+    `# Approved Changes — ${s.doc_name || 'Document'}`,
+    `Reviewed by: ${s.reviewed_by} on ${fmtDate(s.reviewed_at)}`,
+    `Initiated by: ${s.initiated_by || '—'}`,
+    ``,
+    `| # | Type | Page | Original | Corrected | Explanation |`,
+    `|---|------|------|----------|-----------|-------------|`,
+    ...rows,
+    ``,
+    `Total approved/suggested: ${errors.length} of ${(s.report.errors||[]).length} issues`
+  ].join('\n');
+
+  const blob = new Blob([text], { type: 'text/plain' });
+  dlBlob(blob, `${(s.doc_name||'review').replace(/[^a-z0-9]/gi,'_')}-approved.txt`);
+}
+
+function exportFullResults() {
+  const s = _sessionData;
+  const payload = {
+    doc_name:     s.doc_name,
+    initiated_by: s.initiated_by,
+    reviewed_by:  s.reviewed_by,
+    reviewed_at:  s.reviewed_at,
+    decisions:    _decisions,
+    errors:       s.report.errors,
+    summary: {
+      total:     (s.report.errors||[]).length,
+      approved:  Object.values(_decisions).filter(d=>d.decision==='approved').length,
+      rejected:  Object.values(_decisions).filter(d=>d.decision==='rejected').length,
+      suggested: Object.values(_decisions).filter(d=>d.decision==='suggested').length,
+    }
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  dlBlob(blob, `${(s.doc_name||'review').replace(/[^a-z0-9]/gi,'_')}-results.json`);
+}
+
+// ═══════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════
+(function init() {
+  // Load stored config
+  _sbUrl  = localStorage.getItem('review_sb_url')  || '';
+  _sbKey  = localStorage.getItem('review_sb_key')  || '';
+  _myName = localStorage.getItem('review_sb_name') || '';
+
+  // Populate setup inputs
+  const uEl = document.getElementById('sb-url-input');
+  const kEl = document.getElementById('sb-key-input');
+  const nEl = document.getElementById('sb-name-input');
+  if (uEl && _sbUrl) uEl.value = _sbUrl;
+  if (kEl && _sbKey) kEl.value = _sbKey;
+  if (nEl && _myName) nEl.value = _myName;
+
+  // Check URL params
+  const params = new URLSearchParams(location.search);
+  const sessionId = params.get('session');
+
+  if (sessionId) {
+    // Review/results mode — hide dashboard tabs
+    document.getElementById('header-tabs').style.display = 'none';
+    loadReviewSession(sessionId);
+  } else {
+    // Dashboard mode
+    document.getElementById('header-tabs').style.display = 'flex';
+    checkConfig();
+    renderSessionList();
+    showPage('dashboard');
+  }
+})();
+</script>
+</body>
+</html>

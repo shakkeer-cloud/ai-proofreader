@@ -485,6 +485,10 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
               Share as HTML
             </button>
+            <button onclick="exportJSON();closeExportMenu()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+              Export JSON (for Review)
+            </button>
             <div class="menu-divider"></div>
             <button onclick="downloadCorrected();closeExportMenu()">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -543,7 +547,11 @@
     <input type="password" id="api-key-input" placeholder="sk-ant-api03-…" autocomplete="off">
     <p class="help">Stored only in your browser's local storage — never sent anywhere except Anthropic's API.<br>Get a key at <strong>console.anthropic.com</strong>.</p>
     <br>
-    <button class="btn btn-primary" onclick="saveSetup()">Save Key</button>
+    <h3 style="margin-top:14px">👤 Your Name</h3>
+    <input type="text" id="user-name-input" placeholder="e.g. Shakkeer" autocomplete="off" style="margin-top:6px">
+    <p class="help">Shown as "Initiated by" on every report and review request.</p>
+    <br>
+    <button class="btn btn-primary" onclick="saveSetup()">Save</button>
   </div>
   <div class="card" style="border-color:rgba(99,102,241,.3)">
     <h3>ℹ️ About</h3>
@@ -567,7 +575,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v2.6.1</span>
+  <span class="app-footer-version">v2.7.0</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1590,6 +1598,8 @@ function renderReport(r) {
   if (wc) parts.push(`${wc.toLocaleString()} words`);
   if (docInfo.pages) parts.push(`${docInfo.pages} pages`);
   if (docInfo.filename) parts.push(docInfo.filename);
+  const initiator = localStorage.getItem('proof_user_name');
+  if (initiator) parts.push(`Initiated by: ${initiator}`);
   document.getElementById('report-meta').textContent=parts.join(' · ');
 
   // AI cost + model
@@ -2138,7 +2148,26 @@ function toast(msg,type) {
 function saveSetup() {
   const k=document.getElementById('api-key-input').value.trim();
   if (!k) { toast('Please enter your API key.','warn'); return; }
-  localStorage.setItem('proof_api_key',k); toast('API key saved!'); showTab('proof');
+  localStorage.setItem('proof_api_key', k);
+  const name = document.getElementById('user-name-input').value.trim();
+  if (name) localStorage.setItem('proof_user_name', name);
+  toast('Settings saved!'); showTab('proof');
+}
+
+function exportJSON() {
+  if (!lastReport) { toast('No report to export.','warn'); return; }
+  const userName = localStorage.getItem('proof_user_name') || '';
+  const payload = {
+    _export_version: 1,
+    _exported_at: new Date().toISOString(),
+    _initiated_by: userName,
+    _doc_name: docInfo.filename || '',
+    _doc_pages: docInfo.pages || null,
+    ...lastReport,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const base = (docInfo.filename || 'report').replace(/\.[^.]+$/, '');
+  dlBlob(blob, `${base}-review.json`);
 }
 
 // ══════════════════════════════════════════════
@@ -2547,6 +2576,8 @@ function updateCostFooter() {
   // Load glossary into Setup textarea
   const g = localStorage.getItem('proof_glossary') || '';
   const gi = document.getElementById('glossary-input'); if (gi) gi.value = g;
+  const un = localStorage.getItem('proof_user_name') || '';
+  const uni = document.getElementById('user-name-input'); if (uni) uni.value = un;
   // Show all-time cost in footer (session starts at 0 each load)
   updateCostFooter();
   // Restore last report if it was saved within the past 24 hours
