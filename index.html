@@ -6,7 +6,7 @@
   <title>Explorer AI Proofreader</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans+Thai:wght@400;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -197,6 +197,7 @@
     .sev-Minor    { color:var(--muted); }
     .pg-num { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
     .context-snippet { font-size:12px; line-height:1.6; }
+    .context-snippet, td { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Arabic', 'Noto Sans Bengali', 'Noto Sans Devanagari', 'Noto Sans Hebrew', 'Noto Sans Tamil', 'Noto Sans Thai', 'Noto Nastaliq Urdu', sans-serif; }
     mark.orig-mark { background:var(--mark-orig-bg); color:var(--mark-orig-fg); border-radius:3px; padding:1px 2px; font-weight:700; }
     mark.corr-mark { background:var(--mark-corr-bg); color:var(--mark-corr-fg); border-radius:3px; padding:1px 2px; font-weight:700; }
     .copy-btn { background:none; border:none; cursor:pointer; color:var(--muted); padding:3px 5px; border-radius:4px; transition:all .15s; display:inline-flex; align-items:center; }
@@ -389,10 +390,14 @@
         <option value="english">English</option>
         <option value="french">French (Français)</option>
         <option value="german">German (Deutsch)</option>
+        <option value="hebrew">Hebrew (עברית)</option>
         <option value="hindi">Hindi (हिन्दी)</option>
         <option value="indonesian">Indonesian (Bahasa Indonesia)</option>
+        <option value="japanese">Japanese (日本語)</option>
+        <option value="korean">Korean (한국어)</option>
         <option value="malay">Malay (Bahasa Melayu)</option>
         <option value="mandarin">Mandarin (中文)</option>
+        <option value="persian">Persian / Farsi (فارسی)</option>
         <option value="portuguese">Portuguese (Português)</option>
         <option value="russian">Russian (Русский)</option>
         <option value="spanish">Spanish (Español)</option>
@@ -400,12 +405,29 @@
         <option value="tagalog">Tagalog (Filipino)</option>
         <option value="tamil">Tamil (தமிழ்)</option>
         <option value="thai">Thai (ภาษาไทย)</option>
+        <option value="traditional-chinese">Traditional Chinese (繁體中文)</option>
         <option value="turkish">Turkish (Türkçe)</option>
         <option value="urdu">Urdu (اردو)</option>
         <option value="vietnamese">Vietnamese (Tiếng Việt)</option>
         <option value="other">Other…</option>
       </select>
       <input type="text" id="language-other" placeholder="e.g. Tagalog, Swahili, Hindi…" style="display:none;margin-top:6px;width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--sf2);color:var(--text);font-size:12px">
+    </div>
+    <div class="field">
+      <label>Page Layout</label>
+      <select id="page-layout">
+        <option value="auto" selected>Auto-detect</option>
+        <option value="single">Single page</option>
+        <option value="spread">Double-page spread</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Reading Direction</label>
+      <select id="reading-dir">
+        <option value="auto" selected>Auto-detect</option>
+        <option value="ltr">Left-to-right (LTR)</option>
+        <option value="rtl">Right-to-left (RTL)</option>
+      </select>
     </div>
     <div class="field">
       <label>AI Model</label>
@@ -565,9 +587,17 @@
     <h3>ℹ️ About</h3>
     <p class="help" style="font-size:12px">
       Checks for <strong>Typos, Spelling, Grammar, Punctuation, Capitalization, Style, Consistency,</strong> and <strong>Clarity</strong> errors with severity ratings.
-      Supports PDF, Word (.docx), plain text, paste, and batch upload.
-      Exports: PDF, Word, corrected document, shareable HTML.
+      Supports PDF (single-page &amp; double-page spread), Word (.docx), plain text, paste, and batch upload.
+      Multi-language: Arabic, Hebrew, Persian (RTL), Bengali, Hindi, Tamil, Thai, Japanese, Korean and all major Latin-script languages.
+      Exports: PDF, Word, corrected document, shareable HTML, JSON.
     </p>
+  </div>
+  <div class="card" id="cost-tracker-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="margin:0">💰 Cost Tracker</h3>
+      <button class="btn btn-secondary btn-sm" onclick="resetCostStats()">Reset</button>
+    </div>
+    <div id="cost-tracker-body" style="font-size:12px;color:var(--muted);line-height:2"></div>
   </div>
   <div class="card">
     <h3>📖 Custom Glossary</h3>
@@ -583,7 +613,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v2.7.1</span>
+  <span class="app-footer-version">v3.0.0</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -598,6 +628,7 @@
     <div class="modal-row"><span class="lbl">Est. time</span><span class="val" id="cm-time"></span></div>
     <div class="modal-row"><span class="lbl">Checks</span><span class="val" id="cm-checks"></span></div>
     <div class="modal-row"><span class="lbl">Model</span><span class="val" id="cm-model"></span></div>
+    <div class="modal-row" style="display:none"><span class="lbl">Layout</span><span class="val" id="cm-layout-info"></span></div>
     <div class="modal-row" style="border-bottom:none;margin-top:4px"><span class="lbl">Estimated cost</span><span class="modal-cost" id="cm-cost"></span></div>
     <p class="modal-warn">Cost is an estimate based on document size. Actual cost shown after completion.</p>
     <p class="modal-warn" id="cm-large-doc-tip" style="display:none;color:#f97316">⚡ Large document detected — for best results, select <strong>Haiku 4.5</strong> (fastest model, lowest token usage, least likely to hit rate limits).</p>
@@ -638,7 +669,7 @@ const GRADE_CONFIG = [
 const CHAR_LIMIT = 300000;
 const CHUNK_SIZE  = 45000;   // ~16k tokens/chunk — safely under 30k tokens/min rate limit
 const RATE_LIMIT_WAIT_S = 75; // seconds to pause between chunks (generous buffer for sliding window)
-const CHUNK_OVERLAP    = 400; // chars of tail overlap between consecutive chunks to catch boundary errors
+const CHUNK_OVERLAP    = 150; // chars of tail overlap between consecutive chunks to catch boundary errors
 const MODEL_PRICING = {
   'claude-sonnet-4-6':       { in: 3.00,  out: 15.00 },
   'claude-opus-4-7':         { in: 15.00, out: 75.00 },
@@ -687,6 +718,28 @@ function parseClaudeJSON(text) {
 }
 
 // ══════════════════════════════════════════════
+// RTL language helpers
+// ══════════════════════════════════════════════
+const RTL_LANGS = new Set(['arabic','hebrew','persian','urdu']);
+
+function isRTLLang(lang) {
+  if (!lang) return false;
+  const l = lang.toLowerCase();
+  return RTL_LANGS.has(l) || l.includes('arabic') || l.includes('hebrew') ||
+         l.includes('persian') || l.includes('urdu') || l.includes('farsi');
+}
+
+function getPageLayout() {
+  const sel = document.getElementById('page-layout');
+  return sel ? sel.value : 'auto';
+}
+
+function getReadingDir() {
+  const sel = document.getElementById('reading-dir');
+  return sel ? sel.value : 'auto';
+}
+
+// ══════════════════════════════════════════════
 // State
 // ══════════════════════════════════════════════
 let fileQueue        = [];
@@ -696,7 +749,7 @@ let activeFilters    = new Set();
 let activeSevFilter  = new Set();
 let selectedChecks   = new Set(); // empty = All
 let progressAnim     = null;
-let docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+let docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'', isSpread:false, scriptDir:'ltr' };
 let errorTriageState = {};   // {errorId: 'fixed'|'false'} — user triage of each error row
 let _retryState      = null; // stored context for continuing a partial proofreading run
 let _sessionCost     = 0;    // USD spent this browser session
@@ -710,7 +763,7 @@ function startNewDocument() {
   fileQueue = [];
   errorTriageState = {};
   _retryState = null;
-  docInfo = {filename:'',ext:'',fileSize:0,pages:null,pageTexts:[],wordCount:0,charCount:0,paraCount:0,images:null,graphics:null,tables:null,language:''};
+  docInfo = {filename:'',ext:'',fileSize:0,pages:null,pageTexts:[],wordCount:0,charCount:0,paraCount:0,images:null,graphics:null,tables:null,language:'',isSpread:false,scriptDir:'ltr'};
   localStorage.removeItem('proof_last_report');
   document.getElementById('paste-area').value = '';
   const fi = document.getElementById('file-input'); if (fi) fi.value = '';
@@ -737,6 +790,7 @@ function showTab(name) {
     document.querySelectorAll('nav button')[i].classList.toggle('active', t===name);
   });
   if (name === 'history') renderHistory();
+  if (name === 'setup')   renderCostTracker();
 }
 
 // ══════════════════════════════════════════════
@@ -808,17 +862,41 @@ async function extractText(file) {
     setProgressStage('extracting', `Reading PDF…`);
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-    let fullText='', imgCount=0, gfxCount=0;
+    let imgCount=0, gfxCount=0;
     const pages=[];
     const OPS_IMG=pdfjsLib.OPS.paintImageXObject||85;
     const OPS_IIMG=pdfjsLib.OPS.paintInlineImageXObject||86;
     const OPS_FORM=pdfjsLib.OPS.paintFormXObjectBegin||81;
+
+    // Determine spread vs single — check first page width
+    // InDesign double-page spreads are typically 800–1200pt wide (2× a 595pt A4 page)
+    let isSpreadDetected = false;
+    try {
+      const firstPage = await pdf.getPage(1);
+      const vp = firstPage.getViewport({scale:1});
+      isSpreadDetected = vp.width > 750; // wider than A4 = likely a spread
+    } catch(_) {}
+
+    // Resolve spread setting: user override → auto-detect
+    const layoutPref = getPageLayout();
+    const isSpread = layoutPref === 'spread' ? true :
+                     layoutPref === 'single' ? false :
+                     isSpreadDetected;
+    docInfo.isSpread = isSpread;
+
     for (let i=1; i<=pdf.numPages; i++) {
       setProgressStage('extracting', `Reading PDF — page ${i}/${pdf.numPages}…`);
       const page=await pdf.getPage(i);
       const ct=await page.getTextContent();
-      const pt=ct.items.map(x=>x.str).join(' ');
-      pages.push(pt); fullText+=pt+'\n';
+      // Column-aware extraction
+      let pt = buildColumnText(ct.items, isSpread);
+      // NFC normalization — fixes Bengali/Arabic/Hindi glyph fragments
+      try { pt = pt.normalize('NFC'); } catch(_) {}
+      // Remove InDesign shadow-layer decorative text
+      pt = fixDecorativeText(pt);
+      // Compress whitespace
+      pt = compressExtractedText(pt);
+      pages.push(pt);
       try {
         const ops=await page.getOperatorList();
         imgCount+=ops.fnArray.filter(fn=>fn===OPS_IMG||fn===OPS_IIMG).length;
@@ -826,7 +904,36 @@ async function extractText(file) {
       } catch(_) {}
     }
     docInfo.pageTexts=pages; docInfo.graphics=gfxCount;
+
+    let fullText = pages.join('\n');
+
+    // Detect language and apply RTL word-order fix if needed
+    const detectedLangRaw = detectLanguage(fullText);
+    const readingDirPref = getReadingDir();
+    const isRTL = readingDirPref === 'rtl' ? true :
+                  readingDirPref === 'ltr' ? false :
+                  isRTLLang(detectedLangRaw);
+    docInfo.scriptDir = isRTL ? 'rtl' : 'ltr';
+
+    if (isRTL) {
+      // Fix word order page-by-page so page markers stay correct
+      for (let i=0; i<pages.length; i++) {
+        pages[i] = fixRTLWordOrder(pages[i]);
+      }
+      fullText = pages.join('\n');
+    }
+
     populateDocInfo(fullText, pdf.numPages, imgCount, null, 'pdf', null);
+
+    // Warn user if extraction looks garbled
+    const qualWarn = checkExtractionQuality(fullText, pdf.numPages);
+    if (qualWarn) toast(qualWarn, 'warn');
+
+    // Urdu-specific warning — Nastaliq fonts are proprietary, extraction is unreliable
+    if (detectedLangRaw === 'Urdu' || document.getElementById('language').value === 'urdu') {
+      toast('⚠️ Urdu Nastaliq fonts use proprietary glyph mappings — text extraction may be garbled. For best results, copy-paste text directly into the text area.', 'warn');
+    }
+
     return fullText.trim();
   }
   if (ext==='docx'||ext==='doc') {
@@ -868,6 +975,93 @@ function populateDocInfo(text, pages, images, tables, ext, knownParas) {
 function countWords(t) { return (t.match(/\S+/g)||[]).length; }
 
 // ══════════════════════════════════════════════
+// PDF text-extraction helpers (v3.0.0)
+// ══════════════════════════════════════════════
+
+// Build page text from pdf.js items — column-aware for spread pages
+function buildColumnText(items, isSpread) {
+  if (!items || !items.length) return '';
+  // Group items by their approximate Y position (within 3pt tolerance)
+  const rows = [];
+  items.forEach(item => {
+    if (!item.str || !item.str.trim()) return;
+    const ty = Math.round(item.transform[5] / 3) * 3; // quantize Y
+    let row = rows.find(r => r.y === ty);
+    if (!row) { row = {y:ty, items:[]}; rows.push(row); }
+    row.items.push({x: item.transform[4], str: item.str, width: item.width||0});
+  });
+  rows.sort((a,b) => b.y - a.y); // pdf.js origin is bottom-left; descending Y = top-to-bottom
+
+  if (isSpread) {
+    // Split items into left and right columns at the page midpoint
+    const allX = items.map(i => i.transform[4]);
+    const pageWidth = Math.max(...allX);
+    const mid = pageWidth / 2;
+
+    const leftRows = [], rightRows = [];
+    rows.forEach(row => {
+      const leftItems = row.items.filter(i => i.x < mid);
+      const rightItems = row.items.filter(i => i.x >= mid);
+      if (leftItems.length) leftRows.push({y:row.y, items:leftItems});
+      if (rightItems.length) rightRows.push({y:row.y, items:rightItems});
+    });
+    const colToText = colRows =>
+      colRows.map(row => row.items.sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ')).join('\n');
+    return colToText(leftRows) + '\n\n' + colToText(rightRows);
+  }
+
+  // Single page — sort items left-to-right within each row
+  return rows.map(row => row.items.sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ')).join('\n');
+}
+
+// Fix RTL text: pdf.js returns Arabic/Hebrew words in visual L→R order; reverse to reading order
+function fixRTLWordOrder(text) {
+  if (!text) return text;
+  // Split into paragraphs and reverse word order within each RTL paragraph
+  return text.split('\n').map(line => {
+    // Only reverse lines that contain predominantly RTL chars
+    const rtlChars = (line.match(/[؀-ۿ֐-׿ﬀ-﷿]/g)||[]).length;
+    const totalChars = line.replace(/\s/g,'').length;
+    if (!totalChars || rtlChars / totalChars < 0.3) return line;
+    return line.split(/\s+/).filter(Boolean).reverse().join(' ');
+  }).join('\n');
+}
+
+// Remove likely decorative/shadow-layer duplicate text from InDesign
+// e.g. "KK IISSAA HH" → "KI AH" not useful; mark it so AI ignores it
+function fixDecorativeText(text) {
+  if (!text) return text;
+  // Pattern: words where every letter is doubled e.g. "KKEENNAANNGGAANN"
+  return text.replace(/\b([A-Za-z])\1([A-Za-z])\2([A-Za-z])\3([A-Za-z])\4[A-Za-z\1\2\3\4]{2,}\b/g, '');
+}
+
+// Light compression: collapse excessive whitespace, trim blank lines
+function compressExtractedText(text) {
+  if (!text) return text;
+  return text
+    .replace(/[^\S\n]+/g, ' ')        // collapse horizontal whitespace
+    .replace(/\n{3,}/g, '\n\n')        // max 2 consecutive newlines
+    .replace(/[ \t]+\n/g, '\n')        // trailing spaces on lines
+    .trim();
+}
+
+// Check if the extraction looks usable — warns user when text is garbled
+function checkExtractionQuality(text, numPages) {
+  if (!text || !numPages) return null;
+  const words = (text.match(/\S+/g)||[]).length;
+  const avgWordsPerPage = words / numPages;
+  if (avgWordsPerPage < 10) {
+    return `⚠️ Very little text extracted (avg ${Math.round(avgWordsPerPage)} words/page). This PDF may be image-based (scanned) — OCR is not supported. Try copy-pasting text manually.`;
+  }
+  // Check for garbled extraction — lots of short isolated chars
+  const singleChars = (text.match(/(?<!\S)[A-Za-z](?!\S)/g)||[]).length;
+  if (words > 50 && singleChars / words > 0.4) {
+    return `⚠️ Text extraction may be garbled (many isolated characters). This can happen with decorative fonts or secured PDFs. Results may be inaccurate.`;
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════
 // Language detection
 // ══════════════════════════════════════════════
 function toggleOtherLang(val) {
@@ -878,9 +1072,23 @@ function toggleOtherLang(val) {
 
 function detectLanguage(text) {
   if (!text) return 'Unknown';
-  if (/[؀-ۿ]/.test(text)) return 'Arabic';
-  if (/[一-鿿]/.test(text)) return 'Chinese';
+  // Script-based detection first (unambiguous Unicode ranges)
+  if (/[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/.test(text)) {
+    // Distinguish Arabic vs Persian vs Urdu by distinctive chars
+    if (/[ھہۂیں]/.test(text)) return 'Urdu';
+    if (/[کگیپچ]/.test(text)) return 'Persian';
+    return 'Arabic';
+  }
+  if (/[֐-׿יִ-ﭏ]/.test(text)) return 'Hebrew';
+  if (/[ऀ-ॿ]/.test(text)) return 'Hindi';
+  if (/[ঀ-৿]/.test(text)) return 'Bengali';
+  if (/[஀-௿]/.test(text)) return 'Tamil';
+  if (/[฀-๿]/.test(text)) return 'Thai';
+  if (/[぀-ヿ･-ﾟ]/.test(text)) return 'Japanese';
+  if (/[가-힯ᄀ-ᇿ㄰-㆏]/.test(text)) return 'Korean';
+  if (/[一-鿿㐀-䶿]/.test(text)) return 'Chinese';
   if (/[Ѐ-ӿ]/.test(text)) return 'Russian';
+  // Latin-script language scoring
   const lc=text.toLowerCase();
   const id=(lc.match(/\b(yang|dengan|untuk|tidak|adalah|bahwa|atau|juga|sudah|dari|pada|ini|itu|akan|bisa|mereka|kita|saya|anda|sebuah|dalam|lebih|setelah|namun|tersebut|sebagai|telah|jika|maka|oleh|antara|dapat)\b/g)||[]).length;
   const ms=(lc.match(/\b(yang|dengan|untuk|tidak|adalah|atau|juga|sudah|dari|pada|ini|itu|akan|boleh|mereka|kita|saya|anda|dalam|lebih|selepas|namun|tersebut|sebagai|telah|jika|maka|oleh|antara|dapat|kerana|kepada)\b/g)||[]).length;
@@ -995,6 +1203,8 @@ function renderAnalysePanel() {
   add(docInfo.paraCount.toLocaleString(),'¶ Paragraphs (est.)');
   add(readingTime(docInfo.wordCount),'⏱ Reading time');
   add(docInfo.language||'—','🌐 Language');
+  if (docInfo.scriptDir) add(docInfo.scriptDir==='rtl'?'RTL ←':'LTR →','↔ Script Direction');
+  if (docInfo.isSpread!==undefined&&docInfo.ext==='pdf') add(docInfo.isSpread?'Double-page spread':'Single page','📐 Page Layout');
   if (docInfo.images!==null&&docInfo.images!==undefined) add(docInfo.images,'🖼 Images / Photos');
   if (docInfo.graphics!==null&&docInfo.graphics!==undefined) {
     const net=Math.max(0,docInfo.graphics-(docInfo.images||0));
@@ -1039,6 +1249,8 @@ function runDemo() {
 // ══════════════════════════════════════════════
 // Check selector (Proof page)
 // ══════════════════════════════════════════════
+const QUICK_CHECKS = new Set(['Typos','Spelling','Grammar','Punctuation']);
+
 function renderProofChecks() {
   const el = document.getElementById('check-chips');
   el.innerHTML = '';
@@ -1047,6 +1259,16 @@ function renderProofChecks() {
   allBtn.textContent = 'All';
   allBtn.onclick = () => { selectedChecks.clear(); renderProofChecks(); };
   el.appendChild(allBtn);
+
+  // ⚡ Quick preset
+  const isQuick = selectedChecks.size===4 && [...QUICK_CHECKS].every(c=>selectedChecks.has(c));
+  const quickBtn = document.createElement('button');
+  quickBtn.className = 'check-sel-btn' + (isQuick?' on':'');
+  quickBtn.textContent = '⚡ Quick';
+  quickBtn.title = 'Typos, Spelling, Grammar, Punctuation only — fastest & cheapest';
+  if (isQuick) quickBtn.style.background = '#f97316';
+  quickBtn.onclick = () => { selectedChecks.clear(); QUICK_CHECKS.forEach(c=>selectedChecks.add(c)); renderProofChecks(); };
+  el.appendChild(quickBtn);
   ALL_TYPES.forEach(t => {
     const b = document.createElement('button');
     b.className = 'check-sel-btn' + (selectedChecks.has(t)?' on':'');
@@ -1091,10 +1313,37 @@ function showConfirmModal(file, pasteText, apiKey) {
   document.getElementById('cm-words').textContent = words.toLocaleString();
   document.getElementById('cm-chunks').textContent = numChunks === 1 ? '1 (single pass)' : `${numChunks} chunks`;
   document.getElementById('cm-time').textContent = numChunks <= 1 ? 'Under 30 seconds' : fmtTime(estTimeSec);
-  document.getElementById('cm-large-doc-tip').style.display = numChunks >= 3 ? 'block' : 'none';
   document.getElementById('cm-checks').textContent = checks;
   document.getElementById('cm-model').textContent = modelNames[model] || model;
-  document.getElementById('cm-cost').textContent = estCost < 0.01 ? `~$${estCost.toFixed(4)}` : `~$${estCost.toFixed(3)}`;
+
+  // Cost display: total + per-1k-words
+  const costPer1k = words > 0 ? (estCost / words * 1000) : 0;
+  const costStr = estCost < 0.01 ? `~$${estCost.toFixed(4)}` : `~$${estCost.toFixed(3)}`;
+  const per1kStr = costPer1k < 0.01 ? `$${costPer1k.toFixed(4)}/1k words` : `$${costPer1k.toFixed(3)}/1k words`;
+  document.getElementById('cm-cost').textContent = `${costStr}  (${per1kStr})`;
+
+  // Smart model tip: RTL/complex scripts benefit from Sonnet; large = Haiku for speed
+  const tipEl = document.getElementById('cm-large-doc-tip');
+  const isRTL = docInfo.scriptDir === 'rtl';
+  if (isRTL && model === 'claude-haiku-4-5-20251001') {
+    tipEl.innerHTML = '🌐 RTL/complex-script document detected — <strong>Sonnet 4.6</strong> is recommended for best accuracy on Arabic, Hebrew, Bengali, Hindi, and similar scripts.';
+    tipEl.style.display = 'block';
+  } else if (numChunks >= 3) {
+    tipEl.innerHTML = '⚡ Large document detected — for best results, select <strong>Haiku 4.5</strong> (fastest model, lowest token usage, least likely to hit rate limits).';
+    tipEl.style.display = 'block';
+  } else {
+    tipEl.style.display = 'none';
+  }
+
+  // Spread / direction info row
+  const infoEl = document.getElementById('cm-layout-info');
+  if (infoEl) {
+    const layoutParts = [];
+    if (docInfo.isSpread) layoutParts.push('Double-page spread');
+    if (docInfo.scriptDir === 'rtl') layoutParts.push('RTL script');
+    infoEl.closest('.modal-row').style.display = layoutParts.length ? '' : 'none';
+    infoEl.textContent = layoutParts.join(' · ') || '—';
+  }
 
   _pendingProofreadArgs = { file, pasteText, apiKey };
   document.getElementById('confirm-modal').classList.add('open');
@@ -1125,8 +1374,16 @@ function splitIntoChunks(text, size) {
       const boundary = text.lastIndexOf('\n\n', end);
       if (boundary > pos + size * 0.5) { end = boundary; }
       else {
-        const sent = text.lastIndexOf('. ', end);
-        if (sent > pos + size * 0.5) end = sent + 1;
+        // Try Latin sentence boundary first, then CJK punctuation
+        const sentLatin = text.lastIndexOf('. ', end);
+        const sentCJK = Math.max(
+          text.lastIndexOf('。', end),
+          text.lastIndexOf('！', end),
+          text.lastIndexOf('？', end),
+          text.lastIndexOf('；', end),
+        );
+        const best = Math.max(sentLatin, sentCJK);
+        if (best > pos + size * 0.5) end = best + 1;
       }
     }
     chunks.push(text.slice(pos, end).trim());
@@ -1195,7 +1452,8 @@ async function callApiWithRetry(payload, apiKey, ci, total, showUI) {
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,
-               'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+               'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true',
+               'anthropic-beta':'prompt-caching-2024-07-31'},
       body:JSON.stringify(payload),
     });
     if (res.ok) return res;
@@ -1233,13 +1491,13 @@ async function runProofread() {
   if (file) {
     setLoading(true); setProgressStage('reading');
     try {
-      docInfo = { filename:file.name, ext:file.name.split('.').pop().toLowerCase(), fileSize:file.size, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+      docInfo = { filename:file.name, ext:file.name.split('.').pop().toLowerCase(), fileSize:file.size, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'', isSpread:false, scriptDir:'ltr' };
       lastExtractedText = await extractText(file);
     } catch(err) { toast('File error: '+err.message,'err'); setLoading(false); return; }
     setLoading(false);
   } else {
     lastExtractedText = pasteText;
-    docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+    docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'', isSpread:false, scriptDir:'ltr' };
     populateDocInfo(pasteText, null, null, null, 'txt', null);
   }
 
@@ -1278,12 +1536,12 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
   if (!text) {
     setProgressStage('reading');
     if (file) {
-      docInfo = { filename:file.name, ext:file.name.split('.').pop().toLowerCase(), fileSize:file.size, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+      docInfo = { filename:file.name, ext:file.name.split('.').pop().toLowerCase(), fileSize:file.size, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'', isSpread:false, scriptDir:'ltr' };
       try { text = await extractText(file); }
       catch(err) { if (showOnDone) { toast('File error: '+err.message,'err'); setLoading(false); } throw err; }
     } else {
       text = pasteText;
-      docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'' };
+      docInfo = { filename:'', ext:'', fileSize:0, pages:null, pageTexts:[], wordCount:0, charCount:0, paraCount:0, images:null, graphics:null, tables:null, language:'', isSpread:false, scriptDir:'ltr' };
       populateDocInfo(text, null, null, null, 'txt', null);
     }
     lastExtractedText = text;
@@ -1297,8 +1555,10 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
     portuguese:'Portuguese',german:'German',dutch:'Dutch',turkish:'Turkish',
     indonesian:'Indonesian (Bahasa Indonesia)',malay:'Malay (Bahasa Melayu)',
     azerbaijani:'Azerbaijani',bengali:'Bengali',danish:'Danish',hindi:'Hindi',
-    mandarin:'Mandarin Chinese',russian:'Russian',swedish:'Swedish',tagalog:'Tagalog',
-    tamil:'Tamil',thai:'Thai',urdu:'Urdu',vietnamese:'Vietnamese'};
+    mandarin:'Mandarin Chinese','traditional-chinese':'Traditional Chinese',
+    japanese:'Japanese',korean:'Korean',russian:'Russian',swedish:'Swedish',
+    tagalog:'Tagalog',tamil:'Tamil',thai:'Thai',urdu:'Urdu',vietnamese:'Vietnamese',
+    hebrew:'Hebrew',persian:'Persian (Farsi)'};
   const customLang=(lang==='other'?(document.getElementById('language-other').value.trim()||''):null);
   if (lang==='other'&&!customLang) { toast('Please enter the document language.','warn'); return; }
   const resolvedLang=customLang||LANG_NAMES[lang]||lang;
@@ -1308,6 +1568,18 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
 
   const checks = selectedChecks.size > 0 ? [...selectedChecks] : ALL_TYPES;
   const checksLine = `Check ONLY these error types: ${checks.join(', ')}.`;
+
+  // Determine RTL and spread from docInfo
+  const docIsRTL = docInfo.scriptDir === 'rtl' || isRTLLang(resolvedLang);
+  const rtlNote = docIsRTL
+    ? `\nRTL NOTE: This document is in a right-to-left script. Text extraction may reverse word order in some lines. When the text seems reversed or garbled, reconstruct the likely intended text before evaluating it. Do not flag reversed extraction artefacts as errors.`
+    : '';
+  const thaiNote = (resolvedLang==='Thai')
+    ? `\nTHAI NOTE: Thai has no spaces between words. Do not flag missing spaces. Focus on misspelled syllables, wrong tone marks, and wrong vowel forms.`
+    : '';
+  const spreadNote = docInfo.isSpread
+    ? `\nSPREAD NOTE: This is a double-page spread PDF. Text is extracted column by column (left page first, then right page). "--- Page N ---" markers correspond to PDF page numbers, not book pages. Each PDF page contains two book pages side by side.`
+    : '';
 
   const systemPrompt = `You are a professional proofreader. ${langLine}
 ${checksLine}
@@ -1336,7 +1608,7 @@ IMPORTANT RULES:
    - Bad: "The name is spelled consistently; however the pull-quote reads…" — this mixes a non-error with an error.
    - Good: "Pull-quote adds 'itu' not present in body text — inconsistent wording."
    - Max 15 words. Plain English only, even for non-English documents.
-4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}
+4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}${rtlNote}${thaiNote}${spreadNote}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
@@ -1420,8 +1692,15 @@ Return ONLY valid JSON (no markdown, no extra text):
           await new Promise(r => setTimeout(r, 3000)); // brief pause before retry
         }
         try {
+          // Adaptive max_tokens: more budget for larger/RTL chunks; Haiku has smaller context
+          const chunkWords = (chunks[ci].match(/\S+/g)||[]).length;
+          const adaptiveMaxTok = model === 'claude-haiku-4-5-20251001'
+            ? Math.min(4096, Math.max(1500, Math.round(chunkWords / 3)))
+            : Math.min(8000, Math.max(2000, Math.round(chunkWords / 2)));
+
           const res = await callApiWithRetry({
-            model, max_tokens:8000, temperature:0, system:systemPrompt,
+            model, max_tokens:adaptiveMaxTok, temperature:0,
+            system:[{type:'text', text:systemPrompt, cache_control:{type:'ephemeral'}}],
             messages:[{role:'user', content:
               `Proofread this text${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}]
           }, apiKey, ci+1, chunks.length, showOnDone);
@@ -1662,7 +1941,10 @@ function renderReport(r) {
   const modelName = modelDisplayName(r._model);
   if (r._cost != null) {
     const usd = r._cost < 0.01 ? `$${r._cost.toFixed(4)}` : `$${r._cost.toFixed(3)}`;
-    costEl.textContent=`AI cost: ${usd} · ${(r._inputTok||0).toLocaleString()} in + ${(r._outputTok||0).toLocaleString()} out tokens · ${modelName}`;
+    const words = docInfo.wordCount || r.word_count || 0;
+    const per1k = words > 0 ? (r._cost / words * 1000) : 0;
+    const per1kStr = per1k > 0 ? ` · $${per1k < 0.01 ? per1k.toFixed(4) : per1k.toFixed(3)}/1k words` : '';
+    costEl.textContent=`AI cost: ${usd}${per1kStr} · ${(r._inputTok||0).toLocaleString()} in + ${(r._outputTok||0).toLocaleString()} out tokens · ${modelName}`;
     costEl.style.display='block';
   } else if (r._model) {
     costEl.textContent=`Model: ${modelName}`;
@@ -2387,8 +2669,14 @@ async function retryFailedChunks() {
           await new Promise(r => setTimeout(r, 3000));
         }
         try {
+          const chunkWords2 = (chunks[ci].match(/\S+/g)||[]).length;
+          const adaptiveMaxTok2 = model === 'claude-haiku-4-5-20251001'
+            ? Math.min(4096, Math.max(1500, Math.round(chunkWords2 / 3)))
+            : Math.min(8000, Math.max(2000, Math.round(chunkWords2 / 2)));
+
           const res = await callApiWithRetry({
-            model, max_tokens:8000, temperature:0, system:systemPrompt,
+            model, max_tokens:adaptiveMaxTok2, temperature:0,
+            system:[{type:'text', text:systemPrompt, cache_control:{type:'ephemeral'}}],
             messages:[{role:'user', content:
               `Proofread this text (part ${ci+1} of ${chunks.length}):\n\n${chunks[ci]}`}]
           }, apiKey, ci+1, chunks.length, true);
@@ -2619,8 +2907,37 @@ function saveGlossary() {
 }
 
 // ══════════════════════════════════════════════
-// Cost tracking
+// Cost tracking & tracker card
 // ══════════════════════════════════════════════
+function renderCostTracker() {
+  const el = document.getElementById('cost-tracker-body');
+  if (!el) return;
+  try {
+    const stats = JSON.parse(localStorage.getItem('proof_cost_stats') || '{"total":0,"runs":0}');
+    const fmt = v => v <= 0 ? '$0.00' : v < 0.001 ? `<$0.001` : v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(3)}`;
+    const rows = [
+      ['Session cost', fmt(_sessionCost)],
+      ['All-time cost', fmt(stats.total||0)],
+      ['Total runs', `${stats.runs||0} run${(stats.runs||0)!==1?'s':''}`],
+      ['Avg per run', stats.runs > 0 ? fmt((stats.total||0)/stats.runs) : '—'],
+    ];
+    el.innerHTML = rows.map(([k,v]) =>
+      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span>${k}</span><strong style="color:var(--text)">${v}</strong>
+       </div>`
+    ).join('');
+  } catch(e) { el.textContent = 'No data yet.'; }
+}
+
+function resetCostStats() {
+  if (!confirm('Reset all cost tracking data?')) return;
+  localStorage.removeItem('proof_cost_stats');
+  _sessionCost = 0;
+  updateCostFooter();
+  renderCostTracker();
+  toast('Cost stats reset.');
+}
+
 function trackCost(costUsd) {
   if (!costUsd || costUsd <= 0) return;
   _sessionCost += costUsd;
