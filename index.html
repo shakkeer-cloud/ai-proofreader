@@ -613,7 +613,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.0.2</span>
+  <span class="app-footer-version">v3.0.3</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1044,11 +1044,12 @@ function fixRTLWordOrder(text) {
 }
 
 // Remove likely decorative/shadow-layer duplicate text from InDesign
-// e.g. "KK IISSAA HH" → "KI AH" not useful; mark it so AI ignores it
+// e.g. "KKEENNAANNGGAANN", "MMIINNHHAA", "HHIISSTTÓÓRRIIAA", "SSEERRVVIIÇÇOO"
+// Pattern: a word composed entirely of ≥2 consecutively doubled characters.
+// Unicode range À–ɏ covers all Western European accented chars (ã á â ç é ê ó ô õ ú etc.)
 function fixDecorativeText(text) {
   if (!text) return text;
-  // Pattern: words where every letter is doubled e.g. "KKEENNAANNGGAANN"
-  return text.replace(/\b([A-Za-z])\1([A-Za-z])\2([A-Za-z])\3([A-Za-z])\4[A-Za-z\1\2\3\4]{2,}\b/g, '');
+  return text.replace(/\b(?:([A-Za-zÀ-ɏ])\1){2,}\b/gu, '');
 }
 
 // Light compression: collapse excessive whitespace, trim blank lines
