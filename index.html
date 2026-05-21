@@ -2102,6 +2102,19 @@ function buildCtx(context, original, cls, replacement) {
     + esc(context.slice(idx+original.length));
 }
 
+// Plain-text version of buildCtx for use in Word/PDF exports
+// Returns { before, highlight, after } segments
+function buildCtxParts(context, original, replacement) {
+  if (!context || !original) return { before:'', highlight: replacement||original||'', after:'' };
+  const idx = context.toLowerCase().indexOf((original||'').toLowerCase());
+  if (idx === -1) return { before:'', highlight: replacement||original||'', after:'' };
+  return {
+    before:    context.slice(0, idx),
+    highlight: replacement || context.slice(idx, idx + original.length),
+    after:     context.slice(idx + original.length),
+  };
+}
+
 async function copyText(text, btn) {
   try {
     await navigator.clipboard.writeText(text);
@@ -2263,30 +2276,45 @@ async function downloadPDF() {
 
     // Table
     const hasPages=lastReport.errors.some(e=>e.page);
-    // Cols: #, Type, Sev, [Pg], Original, Corrected — Explanation uses remaining space
-    const COLS_BASE=hasPages?[8,20,16,10,38,38]:[8,20,16,44,44];
+    // Cols: #, Type, Sev, [Pg], Original-context, Corrected-context — Explanation uses remainder
+    // Original+Corrected wider to show full context sentences
+    const COLS_BASE=hasPages?[8,18,14,10,46,46]:[8,18,14,52,52];
     const COLS=[...COLS_BASE,CW-COLS_BASE.reduce((a,b)=>a+b,0)];
-    const HEADS=hasPages?['#','Type','Sev','Pg','Original','Corrected','Explanation']:['#','Type','Sev','Original','Corrected','Explanation'];
+    const HEADS=hasPages?['#','Type','Sev','Pg','Original (in context)','Corrected (in context)','Explanation']:['#','Type','Sev','Original (in context)','Corrected (in context)','Explanation'];
     doc.setFont('helvetica','bold'); doc.setFontSize(7.5); gg(100);
     let cx=ML; HEADS.forEach((h,i)=>{ doc.text(h,cx,y); cx+=COLS[i]; });
     y+=2; ln(y,180); y+=3;
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     const SEV_HEX={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8'};
     (lastReport.errors||[]).forEach(e=>{
       if(y>272){doc.addPage();y=14;}
       const sCol=hasPages?4:3, cCol=hasPages?5:4, xCol=hasPages?6:5;
-      const oW=doc.splitTextToSize(`${e.original||''}`,COLS[sCol]-3);
-      const cW=doc.splitTextToSize(`${e.corrected||''}`,COLS[cCol]-3);
+      // Build full context strings (same as web report columns)
+      const oParts = buildCtxParts(e.context, e.original, null);
+      const cParts = buildCtxParts(e.context, e.original, e.corrected);
+      const oFull = (oParts.before + oParts.highlight + oParts.after) || e.original || '';
+      const cFull = (cParts.before + cParts.highlight + cParts.after) || e.corrected || '';
+      const oW=doc.splitTextToSize(oFull, COLS[sCol]-3);
+      const cW=doc.splitTextToSize(cFull, COLS[cCol]-3);
       const xW=doc.splitTextToSize(e.explanation||'',COLS[xCol]-3);
-      const rH=Math.max(oW.length,cW.length,xW.length)*3.8+4;
+      const rH=Math.max(oW.length,cW.length,xW.length)*3.6+4;
+      // Page break if row would overflow
+      if(y+rH>272){doc.addPage();y=14;}
       cx=ML;
       gg(160); doc.setFont('helvetica','normal'); doc.text(String(e.id),cx,y+3); cx+=COLS[0];
       const [tr,tg,tb]=rgb(TYPE_COLORS[e.type]||'#94a3b8'); gc(tr,tg,tb); doc.setFont('helvetica','bold'); doc.text(e.type||'',cx,y+3); cx+=COLS[1]; doc.setFont('helvetica','normal');
       if(e.severity&&SEV_HEX[e.severity]){const [sr,sg,sb]=rgb(SEV_HEX[e.severity]);gc(sr,sg,sb);}else{gg(140);}
-      doc.setFontSize(7); doc.text(e.severity||'',cx,y+3); doc.setFontSize(8); cx+=COLS[2];
+      doc.setFontSize(6.5); doc.text(e.severity||'',cx,y+3); doc.setFontSize(7.5); cx+=COLS[2];
       if(hasPages){gg(160);doc.text(e.page?`p.${e.page}`:'—',cx,y+3);cx+=COLS[3];}
-      gg(80); doc.text(oW,cx,y+3); cx+=COLS[sCol];
-      gg(20); doc.setFont('helvetica','bold'); doc.text(cW,cx,y+3); cx+=COLS[cCol]; doc.setFont('helvetica','normal');
+      // Original context — highlight the original phrase in dark red, rest in grey
+      const oBef=doc.splitTextToSize(oParts.before,COLS[sCol]-3);
+      const oHi =doc.splitTextToSize(oParts.highlight,COLS[sCol]-3);
+      const oAft=doc.splitTextToSize(oParts.after,COLS[sCol]-3);
+      // Simple approach: render full text in one block; bold+dark for the key phrase
+      gg(120); doc.text(oW,cx,y+3); cx+=COLS[sCol];
+      // Corrected context — key phrase in green bold
+      const [cr,cg,cb]=rgb('#006633'); gc(cr,cg,cb); doc.setFont('helvetica','bold');
+      doc.text(cW,cx,y+3); cx+=COLS[cCol]; doc.setFont('helvetica','normal');
       gg(110); doc.text(xW,cx,y+3);
       y+=rH; ln(y,225); y+=1;
     });
@@ -2323,15 +2351,27 @@ async function downloadWord() {
     const cell=(txt,opts={})=>new TableCell({borders:brd,margins:cm,shading:{fill:'FFFFFF'},children:[new Paragraph({children:[new TextRun({text:String(txt||''),bold:!!opts.bold,color:opts.color||'111111',size:opts.size||16,italics:!!opts.italic,font:FONT})]})]});
     const hCell=(txt)=>new TableCell({shading:{fill:'F5F5F5'},borders:brd,margins:cm,children:[new Paragraph({children:[new TextRun({text:txt,bold:true,size:14,color:'444444',font:FONT})]})]});
     const p=(txt,opts={})=>new Paragraph({children:[new TextRun({text:txt,bold:!!opts.bold,size:opts.size||16,color:opts.color||'222222',font:FONT})],spacing:{after:opts.after??80}});
-    const cols=hasPages?['#','Type','Severity','Pg','Original','Corrected','Explanation']:['#','Type','Severity','Original','Corrected','Explanation'];
+    // Context-aware cell: shows full context sentence, with the key phrase styled distinctly
+    const cellCtx=(e,mode)=>{
+      const replacement = mode==='corrected' ? e.corrected : null;
+      const {before,highlight,after}=buildCtxParts(e.context,e.original,replacement);
+      const keyColor = mode==='corrected' ? '006633' : '880000';
+      const runs=[];
+      if(before)  runs.push(new TextRun({text:before,  color:'666666',size:15,font:FONT}));
+      if(highlight)runs.push(new TextRun({text:highlight,color:keyColor,bold:true,size:15,font:FONT}));
+      if(after)   runs.push(new TextRun({text:after,   color:'666666',size:15,font:FONT}));
+      if(!runs.length) runs.push(new TextRun({text:mode==='corrected'?(e.corrected||''):(e.original||''),color:keyColor,bold:true,size:15,font:FONT}));
+      return new TableCell({borders:brd,margins:cm,shading:{fill:'FFFFFF'},children:[new Paragraph({children:runs})]});
+    };
+    const cols=hasPages?['#','Type','Severity','Pg','Original (in context)','Corrected (in context)','Explanation']:['#','Type','Severity','Original (in context)','Corrected (in context)','Explanation'];
     const hRow=new TableRow({children:cols.map(h=>hCell(h))});
     const dRows=r.errors.map(e=>new TableRow({children:[
       cell(e.id,{color:'888888'}),
       cell(e.type,{bold:true,color:hexToDocx(TYPE_COLORS[e.type]||'#94a3b8')}),
       cell(e.severity||'',{bold:true,color:SEV_HEX[e.severity]||'94a3b8'}),
       ...(hasPages?[cell(e.page?`p.${e.page}`:'—',{color:'888888'})]:[]),
-      cell(e.original||'',{italic:true,color:'880000'}),
-      cell(e.corrected||'',{bold:true,color:'006633'}),
+      cellCtx(e,'original'),
+      cellCtx(e,'corrected'),
       cell(e.explanation||'',{color:'444444'}),
     ]}));
     const sumPs=ALL_TYPES.filter(t=>(r.summary[t]||0)>0).map(t=>new Paragraph({children:[new TextRun({text:`${t}: `,bold:true,color:hexToDocx(TYPE_COLORS[t]),font:FONT,size:16}),new TextRun({text:String(r.summary[t]),color:'222222',font:FONT,size:16})],spacing:{after:60}}));
