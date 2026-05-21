@@ -613,7 +613,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.0.1</span>
+  <span class="app-footer-version">v3.0.2</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -994,15 +994,31 @@ function buildColumnText(items, isSpread) {
 
   if (isSpread) {
     // Split items into left and right columns at the page midpoint
+    // Dead-zone (±60pt around mid): spine/binding text that sits at the exact centre
+    // of a spread often gets duplicated into both columns during extraction.
+    // Items whose left edge falls within the dead-zone are assigned to the column
+    // whose centre they are closest to, but only if they aren't already represented
+    // in that column by a nearby item — otherwise they are skipped.
     const allX = items.map(i => i.transform[4]);
     const pageWidth = Math.max(...allX);
     const mid = pageWidth / 2;
+    const DEAD = 60; // pts either side of midpoint = 120pt dead-zone
 
     const leftRows = [], rightRows = [];
     rows.forEach(row => {
-      const leftItems = row.items.filter(i => i.x < mid);
-      const rightItems = row.items.filter(i => i.x >= mid);
-      if (leftItems.length) leftRows.push({y:row.y, items:leftItems});
+      const leftItems  = row.items.filter(i => i.x < mid - DEAD);
+      const rightItems = row.items.filter(i => i.x >= mid + DEAD);
+      // Items inside the dead-zone: assign to the column where they are closer
+      // but only if that column has NO other items in this row (spine-only rows).
+      const spineItems = row.items.filter(i => i.x >= mid - DEAD && i.x < mid + DEAD);
+      if (spineItems.length) {
+        if (!leftItems.length && !rightItems.length) {
+          // Spine-only row (e.g. centred chapter title on a spread): put in left col only
+          leftItems.push(...spineItems);
+        }
+        // If either column already has items, skip spine items (they are duplicates)
+      }
+      if (leftItems.length)  leftRows.push({y:row.y,  items:leftItems});
       if (rightItems.length) rightRows.push({y:row.y, items:rightItems});
     });
     const colToText = colRows =>
@@ -1057,6 +1073,19 @@ function checkExtractionQuality(text, numPages) {
   const singleChars = (text.match(/(?<!\S)[A-Za-z](?!\S)/g)||[]).length;
   if (words > 50 && singleChars / words > 0.4) {
     return `⚠️ Text extraction may be garbled (many isolated characters). This can happen with decorative fonts or secured PDFs. Results may be inaccurate.`;
+  }
+  // Bengali / Indic script: check for Unicode replacement chars (U+FFFD)
+  // These appear when the PDF uses a custom font without a proper Unicode CMap table.
+  // NFC normalisation cannot fix this — it is a font encoding issue in the source PDF.
+  const isBengali = /[ঀ-৿]/.test(text);
+  const isIndic   = /[ऀ-ॿ஀-௿ఀ-౿ಀ-಼ഀ-ൿ]/.test(text);
+  if (isBengali || isIndic) {
+    const replacements = (text.match(/�/g)||[]).length;
+    const totalChars   = text.replace(/\s/g,'').length;
+    if (totalChars > 0 && replacements / totalChars > 0.05) {
+      const pct = Math.round(replacements / totalChars * 100);
+      return `⚠️ ${pct}% of characters could not be decoded (shown as "?"). This is a font encoding issue in the source PDF — the font glyphs are not mapped to Unicode. The AI will try to work with the remaining text, but some words may be incomplete. For best results, use a PDF exported with embedded Unicode fonts. Also note: Bengali vowel signs (matras) may appear detached from their consonants — this is an extraction artefact, not a spelling error.`;
+    }
   }
   return null;
 }
@@ -1577,6 +1606,9 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
   const thaiNote = (resolvedLang==='Thai')
     ? `\nTHAI NOTE: Thai has no spaces between words. Do not flag missing spaces. Focus on misspelled syllables, wrong tone marks, and wrong vowel forms.`
     : '';
+  const bengaliNote = (resolvedLang==='Bengali' || resolvedLang==='Hindi' || resolvedLang==='Tamil')
+    ? `\nINDIC SCRIPT NOTE: This document uses a complex Indic script. PDF text extraction can introduce two types of artefacts that are NOT errors in the original text:\n1. Replacement characters ("?" or U+FFFD) — these appear when the PDF font is missing a Unicode mapping. Do NOT flag any word that contains a replacement character. Skip it entirely.\n2. Detached vowel signs (matras) — a vowel mark may appear separated from its host consonant (e.g. "দবু" instead of "দুব"). Do not flag these as spelling errors — they are extraction artefacts.\nAlso note: consecutive identical consonants at word boundaries (e.g. রর, যয, কক) are often legitimate genitive or compound forms in Bengali, not typos. Only flag as Typos if you are 100% certain the word is genuinely duplicated.`
+    : '';
   const spreadNote = docInfo.isSpread
     ? `\nSPREAD NOTE: This is a double-page spread PDF. Text is extracted column by column (left page first, then right page). "--- Page N ---" markers correspond to PDF page numbers, not book pages. Each PDF page contains two book pages side by side.`
     : '';
@@ -1608,7 +1640,7 @@ IMPORTANT RULES:
    - Bad: "The name is spelled consistently; however the pull-quote reads…" — this mixes a non-error with an error.
    - Good: "Pull-quote adds 'itu' not present in body text — inconsistent wording."
    - Max 15 words. Plain English only, even for non-English documents.
-4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}${rtlNote}${thaiNote}${spreadNote}
+4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}${rtlNote}${thaiNote}${bengaliNote}${spreadNote}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
