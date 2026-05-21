@@ -396,7 +396,9 @@
         <option value="japanese">Japanese (日本語)</option>
         <option value="korean">Korean (한국어)</option>
         <option value="malay">Malay (Bahasa Melayu)</option>
+        <option value="malayalam">Malayalam (മലയാളം)</option>
         <option value="mandarin">Mandarin (中文)</option>
+        <option value="mongolian">Mongolian (Монгол)</option>
         <option value="persian">Persian / Farsi (فارسی)</option>
         <option value="portuguese">Portuguese (Português)</option>
         <option value="russian">Russian (Русский)</option>
@@ -408,7 +410,9 @@
         <option value="traditional-chinese">Traditional Chinese (繁體中文)</option>
         <option value="turkish">Turkish (Türkçe)</option>
         <option value="urdu">Urdu (اردو)</option>
+        <option value="uzbek">Uzbek (Ўзбекча)</option>
         <option value="vietnamese">Vietnamese (Tiếng Việt)</option>
+        <option value="italian">Italian (Italiano)</option>
         <option value="other">Other…</option>
       </select>
       <input type="text" id="language-other" placeholder="e.g. Tagalog, Swahili, Hindi…" style="display:none;margin-top:6px;width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--sf2);color:var(--text);font-size:12px">
@@ -613,7 +617,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.0.3</span>
+  <span class="app-footer-version">v3.0.4</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1044,12 +1048,13 @@ function fixRTLWordOrder(text) {
 }
 
 // Remove likely decorative/shadow-layer duplicate text from InDesign
-// e.g. "KKEENNAANNGGAANN", "MMIINNHHAA", "HHIISSTTÓÓRRIIAA", "SSEERRVVIIÇÇOO"
+// e.g. "KKEENNAANNGGAANN", "MMIINNHHAA", "HHIISSTTÓÓRRIIAA", "SSEERRVVIIÇÇOO",
+//      "ББааххтт" (Cyrillic), "ММУУҲҲААММММААДД" (Uzbek Cyrillic)
 // Pattern: a word composed entirely of ≥2 consecutively doubled characters.
-// Unicode range À–ɏ covers all Western European accented chars (ã á â ç é ê ó ô õ ú etc.)
+// Covers: Latin + Western European accents (À–ɏ) + full Cyrillic block (Ѐ–ӿ)
 function fixDecorativeText(text) {
   if (!text) return text;
-  return text.replace(/\b(?:([A-Za-zÀ-ɏ])\1){2,}\b/gu, '');
+  return text.replace(/\b(?:([A-Za-zÀ-ɏѐ-ӿ])\1){2,}\b/gu, '');
 }
 
 // Light compression: collapse excessive whitespace, trim blank lines
@@ -1079,7 +1084,7 @@ function checkExtractionQuality(text, numPages) {
   // These appear when the PDF uses a custom font without a proper Unicode CMap table.
   // NFC normalisation cannot fix this — it is a font encoding issue in the source PDF.
   const isBengali = /[ঀ-৿]/.test(text);
-  const isIndic   = /[ऀ-ॿ஀-௿ఀ-౿ಀ-಼ഀ-ൿ]/.test(text);
+  const isIndic   = /[ऀ-ॿ஀-௿ఀ-౿ಀ-಼ഀ-ൿ]/.test(text); // Hindi, Tamil, Telugu, Kannada, Malayalam
   if (isBengali || isIndic) {
     const replacements = (text.match(/�/g)||[]).length;
     const totalChars   = text.replace(/\s/g,'').length;
@@ -1117,7 +1122,16 @@ function detectLanguage(text) {
   if (/[぀-ヿ･-ﾟ]/.test(text)) return 'Japanese';
   if (/[가-힯ᄀ-ᇿ㄰-㆏]/.test(text)) return 'Korean';
   if (/[一-鿿㐀-䶿]/.test(text)) return 'Chinese';
-  if (/[Ѐ-ӿ]/.test(text)) return 'Russian';
+  // Cyrillic-script languages — check distinctive chars before falling back to Russian
+  if (/[Ѐ-ӿ]/.test(text)) {
+    // Mongolian uses standard Cyrillic + Ө (U+04E9) and Ү (U+04AE/04AF)
+    if (/[ӨөҮү]/.test(text) && !/[ҲҳҚқҒғЎў]/.test(text)) return 'Mongolian';
+    // Uzbek uses Cyrillic + Ҳ (U+04B3), Қ (U+049A), Ғ (U+0492), Ў (U+04EF)
+    if (/[ҲҳҚқҒғЎў]/.test(text)) return 'Uzbek';
+    return 'Russian';
+  }
+  // Malayalam (U+0D00–U+0D7F) — check before Latin scoring
+  if (/[ഀ-ൿ]/.test(text)) return 'Malayalam';
   // Latin-script language scoring
   const lc=text.toLowerCase();
   const id=(lc.match(/\b(yang|dengan|untuk|tidak|adalah|bahwa|atau|juga|sudah|dari|pada|ini|itu|akan|bisa|mereka|kita|saya|anda|sebuah|dalam|lebih|setelah|namun|tersebut|sebagai|telah|jika|maka|oleh|antara|dapat)\b/g)||[]).length;
@@ -1588,7 +1602,8 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
     mandarin:'Mandarin Chinese','traditional-chinese':'Traditional Chinese',
     japanese:'Japanese',korean:'Korean',russian:'Russian',swedish:'Swedish',
     tagalog:'Tagalog',tamil:'Tamil',thai:'Thai',urdu:'Urdu',vietnamese:'Vietnamese',
-    hebrew:'Hebrew',persian:'Persian (Farsi)'};
+    hebrew:'Hebrew',persian:'Persian (Farsi)',malayalam:'Malayalam',
+    mongolian:'Mongolian',uzbek:'Uzbek',italian:'Italian'};
   const customLang=(lang==='other'?(document.getElementById('language-other').value.trim()||''):null);
   if (lang==='other'&&!customLang) { toast('Please enter the document language.','warn'); return; }
   const resolvedLang=customLang||LANG_NAMES[lang]||lang;
@@ -1607,8 +1622,8 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
   const thaiNote = (resolvedLang==='Thai')
     ? `\nTHAI NOTE: Thai has no spaces between words. Do not flag missing spaces. Focus on misspelled syllables, wrong tone marks, and wrong vowel forms.`
     : '';
-  const bengaliNote = (resolvedLang==='Bengali' || resolvedLang==='Hindi' || resolvedLang==='Tamil')
-    ? `\nINDIC SCRIPT NOTE: This document uses a complex Indic script. PDF text extraction can introduce two types of artefacts that are NOT errors in the original text:\n1. Replacement characters ("?" or U+FFFD) — these appear when the PDF font is missing a Unicode mapping. Do NOT flag any word that contains a replacement character. Skip it entirely.\n2. Detached vowel signs (matras) — a vowel mark may appear separated from its host consonant (e.g. "দবু" instead of "দুব"). Do not flag these as spelling errors — they are extraction artefacts.\nAlso note: consecutive identical consonants at word boundaries (e.g. রর, যয, কক) are often legitimate genitive or compound forms in Bengali, not typos. Only flag as Typos if you are 100% certain the word is genuinely duplicated.`
+  const bengaliNote = (resolvedLang==='Bengali' || resolvedLang==='Hindi' || resolvedLang==='Tamil' || resolvedLang==='Malayalam')
+    ? `\nINDIC SCRIPT NOTE: This document uses a complex Indic script. PDF text extraction can introduce two types of artefacts that are NOT errors in the original text:\n1. Replacement characters ("?" or U+FFFD) — these appear when the PDF font is missing a Unicode mapping. Do NOT flag any word that contains a replacement character. Skip it entirely.\n2. Detached vowel signs (matras) — a vowel mark may appear separated from its host consonant. Do not flag these as spelling errors — they are extraction artefacts.\nAlso note: consecutive identical consonants at word boundaries are often legitimate genitive or compound forms in Indic scripts, not typos. Only flag as Typos if you are 100% certain the word is genuinely duplicated.`
     : '';
   const spreadNote = docInfo.isSpread
     ? `\nSPREAD NOTE: This is a double-page spread PDF. Text is extracted column by column (left page first, then right page). "--- Page N ---" markers correspond to PDF page numbers, not book pages. Each PDF page contains two book pages side by side.`
