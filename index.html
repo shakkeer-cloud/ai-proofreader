@@ -617,7 +617,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.0.4</span>
+  <span class="app-footer-version">v3.0.5</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1064,7 +1064,8 @@ function compressExtractedText(text) {
     .replace(/[^\S\n]+/g, ' ')        // collapse horizontal whitespace
     .replace(/\n{3,}/g, '\n\n')        // max 2 consecutive newlines
     .replace(/[ \t]+\n/g, '\n')        // trailing spaces on lines
-    .trim();
+    .replace(/[ \t]+([,;])/g, '$1')    // remove extraction-artifact spaces before comma/semicolon
+    .trim();                           // (InDesign text-frame boundaries insert spaces before punctuation)
 }
 
 // Check if the extraction looks usable — warns user when text is garbled
@@ -1656,7 +1657,12 @@ IMPORTANT RULES:
    - Bad: "The name is spelled consistently; however the pull-quote reads…" — this mixes a non-error with an error.
    - Good: "Pull-quote adds 'itu' not present in body text — inconsistent wording."
    - Max 15 words. Plain English only, even for non-English documents.
-4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.${(()=>{const g=getGlossary();return g.length?`\n5. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}${rtlNote}${thaiNote}${bengaliNote}${spreadNote}
+4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.
+5. PDF EXTRACTION ARTEFACTS — these are NOT errors, never flag them:
+   a. Quotation mark shape: curly/smart quotes (‘ ’ “ ”) are often extracted as straight apostrophes (' "). Do NOT flag the shape of quotation marks — only flag if an apostrophe is completely missing (e.g. "its" instead of "it's").
+   b. Text that appears incoherent or uses an unexpected word mid-sentence at a column boundary (e.g. a name suddenly interrupted by an unrelated word) — this is a multi-column extraction artefact. Do NOT flag or attempt to reconstruct such text.
+6. CONTEXT BOUNDARY RULE: Each chunk of text is a partial extract. A sentence may be incomplete at the start or end of a chunk. Do NOT flag missing words or punctuation that you expect to appear outside the provided context. Only flag what you can see.
+7. ORIGINAL FIELD RULE: The "original" field MUST contain the exact substring where the error occurs. It must appear verbatim inside the "context" field. Never put one part of the sentence in "original" while describing an error in a different part of the same sentence.${(()=>{const g=getGlossary();return g.length?`\n8. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}${rtlNote}${thaiNote}${bengaliNote}${spreadNote}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
@@ -2619,6 +2625,9 @@ const FALSE_POS_PHRASES = [
 ];
 function isFalsePositive(error) {
   if (!error || !error.explanation) return false;
+  // Original == corrected means no actual correction — always a false positive
+  // (covers errors where Claude flags a layout concern or style note with no textual change)
+  if ((error.original||'').trim() === (error.corrected||'').trim()) return true;
   const expl = error.explanation.toLowerCase();
   return FALSE_POS_PHRASES.some(p => expl.includes(p));
 }
