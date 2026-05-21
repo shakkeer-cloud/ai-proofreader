@@ -4,49 +4,42 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Proofread Share · Explorer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <style>
     :root {
-      --bg:      #0f1117;
-      --surface: #1a1d27;
-      --sf2:     #22263a;
-      --border:  #2a2d3a;
-      --text:    #e1e4f0;
-      --muted:   #8b8fa8;
-      --primary: #6c63ff;
-      --ph:      #5b52ee;
-      --success: #10b981;
-      --danger:  #ef4444;
-      --warning: #f59e0b;
+      --bg:      #0f1117; --surface: #1a1d27; --sf2: #22263a;
+      --border:  #2a2d3a; --text:    #e1e4f0; --muted:   #8b8fa8;
+      --primary: #6c63ff; --ph:      #5b52ee;
+      --success: #10b981; --danger:  #ef4444; --warning: #f59e0b;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
-
-    /* ── Layout ── */
-    .page { display: none; max-width: 960px; margin: 0 auto; padding: 24px 16px 80px; }
+    .page { display: none; max-width: 980px; margin: 0 auto; padding: 24px 16px 100px; }
     .page.active { display: block; }
 
-    /* ── Header ── */
+    /* Header */
     .app-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; align-items: center; gap: 12px; height: 52px; position: sticky; top: 0; z-index: 50; }
-    .app-logo { font-size: 15px; font-weight: 700; color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .app-logo { font-size: 15px; font-weight: 700; color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 8px; }
     .header-tabs { display: flex; gap: 2px; margin-left: auto; }
     .header-tab { background: none; border: none; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all .15s; }
     .header-tab.active, .header-tab:hover { background: var(--sf2); color: var(--text); }
     .header-tab.active { color: var(--primary); }
 
-    /* ── Cards ── */
+    /* Cards */
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
     .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
     .help { font-size: 12px; color: var(--muted); line-height: 1.6; }
 
-    /* ── Inputs ── */
-    input[type=text], input[type=password], input[type=email] {
+    /* Inputs */
+    input[type=text], input[type=password] {
       width: 100%; background: var(--sf2); border: 1px solid var(--border); border-radius: 8px;
       color: var(--text); font-size: 13px; padding: 9px 12px; outline: none; transition: border-color .15s;
     }
     input:focus { border-color: var(--primary); }
     label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 5px; }
 
-    /* ── Buttons ── */
+    /* Buttons */
     .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; text-decoration: none; white-space: nowrap; }
     .btn-primary  { background: var(--primary); color: #fff; }
     .btn-primary:hover  { background: var(--ph); }
@@ -61,76 +54,90 @@
     .btn-sm { padding: 5px 10px; font-size: 12px; }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
 
-    /* ── Toast ── */
+    /* Toast */
     #toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 999; max-width: 320px; }
     #toast.show { opacity: 1; transform: translateY(0); }
-    #toast.ok   { background: #10b981; color: #fff; }
+    #toast.ok { background: #10b981; color: #fff; }
     #toast.warn { background: #f59e0b; color: #000; }
     #toast.err  { background: #ef4444; color: #fff; }
 
-    /* ── Loading overlay ── */
+    /* Loading */
     #loading-overlay { display: none; position: fixed; inset: 0; background: rgba(15,17,23,.85); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
     #loading-overlay.show { display: flex; }
     .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     #loading-msg { font-size: 14px; font-weight: 600; color: var(--muted); }
 
-    /* ── Banners ── */
+    /* Banners */
     .banner-warn    { background: #f59e0b18; border: 1px solid #f59e0b40; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
     .banner-info    { background: #6c63ff18; border: 1px solid #6c63ff40; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
-    .banner-success { background: #10b98118; border: 1px solid #10b98140; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+    .banner-success { background: #10b98118; border: 1px solid #10b98140; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; font-size: 13px; }
 
-    /* ── Report preview card ── */
+    /* Report preview */
     .report-preview { background: var(--sf2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
-    .report-preview-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
-    .rp-field { }
+    .rp-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
     .rp-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
     .rp-value { font-size: 13px; font-weight: 600; margin-top: 2px; }
 
-    /* ── Link box ── */
+    /* Link box */
     .link-box { background: var(--sf2); border: 1px solid var(--primary); border-radius: 8px; padding: 10px 44px 10px 12px; font-size: 12px; font-family: monospace; word-break: break-all; color: var(--primary); margin-top: 10px; cursor: pointer; position: relative; }
     .link-box::after { content: '📋 Copy'; position: absolute; top: 50%; right: 10px; transform: translateY(-50%); font-size: 11px; color: var(--muted); font-family: inherit; }
     .link-box:hover { border-color: var(--ph); }
 
-    /* ── Session list ── */
+    /* Session list */
     .session-item { background: var(--sf2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
-    .session-item-info { flex: 1; min-width: 0; }
-    .session-item-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .session-item-meta  { font-size: 11px; color: var(--muted); margin-top: 3px; }
-    .session-item-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+    .si-info { flex: 1; min-width: 0; }
+    .si-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .si-meta  { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .si-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
     .empty-state { text-align: center; padding: 28px; color: var(--muted); font-size: 13px; }
 
-    /* ── Status badge ── */
+    /* Badges */
     .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
     .badge-pending  { background: #f59e0b22; color: var(--warning); border: 1px solid #f59e0b40; }
     .badge-reviewed { background: #10b98122; color: var(--success); border: 1px solid #10b98140; }
 
-    /* ── Review header ── */
+    /* Review header */
     .review-header { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; }
     .review-header h2 { font-size: 17px; font-weight: 700; }
     .review-header .meta { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.7; }
-    .review-header .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .review-header .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .chip { background: var(--sf2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600; }
     .chip span { color: var(--muted); font-weight: 400; }
 
-    /* ── Progress bar ── */
+    /* Progress */
     .progress-row { display: flex; align-items: center; gap: 12px; background: var(--sf2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
     .progress-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
     .progress-fill  { height: 100%; background: var(--primary); border-radius: 3px; transition: width .3s; }
     .progress-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
-    /* ── Filter bar ── */
-    .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
-    .filter-bar .filter-label { font-size: 11px; color: var(--muted); }
-    .filt-btn { background: var(--sf2); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; padding: 4px 10px; cursor: pointer; transition: all .15s; }
+    /* Filter bars */
+    .filter-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .filter-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+    .filter-row-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; min-width: 36px; }
+    .filt-btn { background: var(--sf2); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; padding: 3px 9px; cursor: pointer; transition: all .15s; }
     .filt-btn.on { color: #fff; border-color: transparent; }
-    .filt-btn.f-all.on       { background: var(--primary); }
-    .filt-btn.f-approved.on  { background: var(--success); }
-    .filt-btn.f-rejected.on  { background: var(--danger); }
-    .filt-btn.f-suggested.on { background: var(--warning); color: #000; }
-    .filt-btn.f-pending.on   { background: var(--muted); }
+    .filt-btn.fd-all.on      { background: var(--primary); }
+    .filt-btn.fd-approved.on { background: var(--success); }
+    .filt-btn.fd-rejected.on { background: var(--danger); }
+    .filt-btn.fd-suggested.on { background: var(--warning); color: #000; }
+    .filt-btn.fd-pending.on  { background: var(--muted); }
+    .filt-btn.fs-Critical.on { background: var(--danger); }
+    .filt-btn.fs-Moderate.on { background: var(--warning); color: #000; }
+    .filt-btn.fs-Minor.on    { background: var(--muted); }
+    .filter-count { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
 
-    /* ── Review table ── */
+    /* Results stats */
+    .results-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; flex: 1; min-width: 100px; text-align: center; }
+    .stat-box .num { font-size: 22px; font-weight: 800; }
+    .stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .stat-approved  .num { color: var(--success); }
+    .stat-rejected  .num { color: var(--danger); }
+    .stat-suggested .num { color: var(--warning); }
+    .stat-pending   .num { color: var(--muted); }
+
+    /* Table */
     .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
     table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
     thead th { background: var(--sf2); color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
@@ -141,14 +148,13 @@
     tbody tr.row-rejected  { background: #ef444408; }
     tbody tr.row-suggested { background: #f59e0b08; }
     td { padding: 8px 10px; vertical-align: top; }
-
-    col.c-num  { width: 32px; }
-    col.c-type { width: 90px; }
-    col.c-pg   { width: 36px; }
-    col.c-orig { width: 17%; }
-    col.c-corr { width: 17%; }
+    col.c-num  { width: 30px; }
+    col.c-type { width: 88px; }
+    col.c-pg   { width: 34px; }
+    col.c-orig { width: 16%; }
+    col.c-corr { width: 16%; }
     col.c-expl { width: auto; }
-    col.c-dec  { width: 165px; }
+    col.c-dec  { width: 160px; }
 
     .type-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; display: inline-block; white-space: nowrap; }
     .sev-badge  { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px; margin-top: 3px; display: inline-block; }
@@ -174,7 +180,7 @@
     .suggest-input { width: 100%; font-size: 11px; padding: 4px 7px; border-radius: 5px; background: var(--sf2); border: 1px solid var(--border); color: var(--text); resize: none; display: none; }
     .suggest-input.show { display: block; }
 
-    /* Decision labels (results mode) */
+    /* Decision labels */
     .dec-label { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; display: inline-block; }
     .lbl-approved  { background: #10b98122; color: var(--success); }
     .lbl-rejected  { background: #ef444422; color: var(--danger); }
@@ -182,30 +188,34 @@
     .lbl-pending   { background: var(--sf2); color: var(--muted); border: 1px solid var(--border); }
     .sug-text { font-size: 11px; color: var(--warning); margin-top: 4px; font-style: italic; word-break: break-word; }
 
-    /* ── Reviewer name bar ── */
+    /* Reviewer name bar */
     .reviewer-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .reviewer-bar label { margin: 0; white-space: nowrap; }
     .reviewer-bar input { max-width: 220px; flex: 1; }
 
-    /* ── Sticky bottom bar ── */
-    .bottom-bar { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; z-index: 40; }
+    /* Sticky bottom bar */
+    .bottom-bar { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; z-index: 40; }
     .bottom-bar .summary { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
 
-    /* ── Results stats ── */
-    .results-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; flex: 1; min-width: 110px; text-align: center; }
-    .stat-box .num { font-size: 22px; font-weight: 800; }
-    .stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
-    .stat-approved  .num { color: var(--success); }
-    .stat-rejected  .num { color: var(--danger); }
-    .stat-suggested .num { color: var(--warning); }
-    .stat-pending   .num { color: var(--muted); }
+    /* Export dropdown */
+    .export-wrap { position: relative; display: inline-block; }
+    .export-dropdown { display: none; position: absolute; bottom: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; min-width: 200px; overflow: hidden; z-index: 60; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+    .export-dropdown.open { display: block; }
+    .export-dropdown button { display: flex; width: 100%; padding: 10px 14px; font-size: 12px; font-weight: 600; color: var(--text); background: none; border: none; cursor: pointer; gap: 8px; align-items: center; }
+    .export-dropdown button:hover { background: var(--sf2); }
+    .export-dropdown .sep { height: 1px; background: var(--border); margin: 2px 0; }
 
-    /* ── SQL block ── */
+    /* Resend card */
+    .resend-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-top: 16px; }
+    .resend-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    .resend-options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+    /* New link banner (floating) */
+    .new-link-banner { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 100; max-width: 560px; width: calc(100% - 32px); background: var(--surface); border: 1px solid var(--success); border-radius: 12px; padding: 16px 18px; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+
+    /* SQL block */
     .sql-block { background: #0a0c14; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-family: monospace; font-size: 11px; color: #a5b4fc; line-height: 1.7; white-space: pre-wrap; word-break: break-all; margin-top: 8px; overflow-x: auto; }
     .sep { height: 1px; background: var(--border); margin: 16px 0; }
-
-    /* ── Footer ── */
     .app-footer { text-align: center; font-size: 11px; color: var(--muted); padding: 20px; opacity: .5; }
   </style>
 </head>
@@ -214,7 +224,6 @@
 <div id="loading-overlay"><div class="spinner"></div><div id="loading-msg">Loading…</div></div>
 <div id="toast"></div>
 
-<!-- ═══════════════ HEADER ═══════════════ -->
 <header class="app-header">
   <a class="app-logo" href="index.html">📝 <span style="color:var(--muted);font-weight:400">Proofreader</span> <span style="color:var(--border)">›</span> Share</a>
   <div class="header-tabs" id="header-tabs">
@@ -223,35 +232,29 @@
   </div>
 </header>
 
-<!-- ═══════════════ DASHBOARD ═══════════════ -->
+<!-- ══════════ DASHBOARD ══════════ -->
 <div class="page active" id="dash-page">
 
-  <!-- Setup needed banner -->
   <div class="banner-warn" id="setup-banner" style="display:none">
     ⚙️ <strong>Supabase not configured.</strong>
-    Go to <strong>Setup</strong> to enter your credentials before sharing reviews.
     <button class="btn btn-warn btn-sm" style="margin-left:8px" onclick="showPage('setup')">Open Setup →</button>
   </div>
 
-  <!-- Latest report card -->
   <div class="card">
     <h3>📄 Latest Proofreading Report</h3>
-    <p class="help">Automatically loaded from your last proofreading session in the main app.</p>
+    <p class="help">Automatically loaded from your last session in the main app — no export needed.</p>
     <div id="report-preview-area" style="margin-top:14px"></div>
     <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-primary" id="share-btn" onclick="createSession()" disabled>
-        🔗 Create Review Link
-      </button>
-      <span class="help" id="share-btn-hint"></span>
+      <button class="btn btn-primary" id="share-btn" onclick="createSession()" disabled>🔗 Create Review Link</button>
+      <span class="help" id="share-hint"></span>
     </div>
-    <div id="created-link-wrap" style="display:none;margin-top:14px">
+    <div id="new-link-wrap" style="display:none;margin-top:14px">
       <div style="font-size:12px;font-weight:600;color:var(--success);margin-bottom:6px">✓ Review session created! Share this link:</div>
       <div class="link-box" id="new-link" onclick="copyText(this.dataset.url)"></div>
       <div class="help" style="margin-top:6px">Link expires in 30 days · Anyone with the link can review</div>
     </div>
   </div>
 
-  <!-- My sessions -->
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <h3 style="margin:0">📋 My Review Sessions</h3>
@@ -262,37 +265,52 @@
 
 </div>
 
-<!-- ═══════════════ REVIEW / RESULTS (loaded via ?r=ID) ═══════════════ -->
+<!-- ══════════ REVIEW / RESULTS ══════════ -->
 <div class="page" id="review-page">
 
   <div id="rv-header"></div>
 
-  <!-- Reviewer name (review mode only) -->
   <div class="reviewer-bar" id="rv-name-bar">
     <label>Your name:</label>
     <input type="text" id="rv-name" placeholder="Enter your name before submitting…">
   </div>
 
-  <!-- Progress -->
   <div class="progress-row" id="rv-progress">
     <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
     <div class="progress-label" id="prog-label">0 / 0 reviewed</div>
   </div>
 
-  <!-- Filters -->
-  <div class="filter-bar">
-    <span class="filter-label">FILTER:</span>
-    <button class="filt-btn f-all on"      onclick="applyFilter('all',this)">All</button>
-    <button class="filt-btn f-approved"    onclick="applyFilter('approved',this)">✓ Approved</button>
-    <button class="filt-btn f-rejected"    onclick="applyFilter('rejected',this)">✗ Rejected</button>
-    <button class="filt-btn f-suggested"   onclick="applyFilter('suggested',this)">✎ Suggested</button>
-    <button class="filt-btn f-pending"     onclick="applyFilter('pending',this)">Undecided</button>
+  <!-- Filter section -->
+  <div class="filter-section">
+    <!-- Row 1: Decision -->
+    <div class="filter-row">
+      <span class="filter-row-label">Decision</span>
+      <button class="filt-btn fd-all on"      onclick="setFilter('dec','all',this)">All</button>
+      <button class="filt-btn fd-approved"    onclick="setFilter('dec','approved',this)">✓ Approved</button>
+      <button class="filt-btn fd-rejected"    onclick="setFilter('dec','rejected',this)">✗ Rejected</button>
+      <button class="filt-btn fd-suggested"   onclick="setFilter('dec','suggested',this)">✎ Suggested</button>
+      <button class="filt-btn fd-pending"     onclick="setFilter('dec','pending',this)">Undecided</button>
+      <span class="filter-count" id="filter-count"></span>
+    </div>
+    <!-- Row 2: Type (built dynamically) -->
+    <div class="filter-row" id="type-filter-row">
+      <span class="filter-row-label">Type</span>
+      <button class="filt-btn ft-all on" onclick="setFilter('type','all',this)">All</button>
+      <span id="type-filter-btns"></span>
+    </div>
+    <!-- Row 3: Severity -->
+    <div class="filter-row">
+      <span class="filter-row-label">Severity</span>
+      <button class="filt-btn fs-all on"          onclick="setFilter('sev','all',this)">All</button>
+      <button class="filt-btn fs-Critical"         onclick="setFilter('sev','Critical',this)" style="color:var(--danger);border-color:#ef444440">Critical</button>
+      <button class="filt-btn fs-Moderate"         onclick="setFilter('sev','Moderate',this)" style="color:var(--warning);border-color:#f59e0b40">Moderate</button>
+      <button class="filt-btn fs-Minor"            onclick="setFilter('sev','Minor',this)">Minor</button>
+    </div>
   </div>
 
-  <!-- Results stats (results mode only) -->
+  <!-- Results stats (results mode) -->
   <div class="results-stats" id="results-stats" style="display:none"></div>
 
-  <!-- Table -->
   <div class="table-wrap">
     <table>
       <colgroup>
@@ -301,7 +319,7 @@
       </colgroup>
       <thead>
         <tr>
-          <th>#</th><th>Type</th><th>Pg</th>
+          <th>#</th><th>Type / Sev</th><th>Pg</th>
           <th>Original</th><th>Corrected</th><th>Explanation</th>
           <th id="dec-th">Your Decision</th>
         </tr>
@@ -310,29 +328,55 @@
     </table>
   </div>
 
-  <!-- Submit bar (review mode) -->
+  <!-- Submit bar -->
   <div class="bottom-bar" id="submit-bar">
     <div class="summary" id="submit-summary">Make decisions above, then submit.</div>
     <button class="btn btn-primary" id="submit-btn" onclick="submitReview()" disabled>Submit Review</button>
   </div>
 
-  <!-- Results bar (results mode) -->
+  <!-- Results bar -->
   <div class="bottom-bar" id="results-bar" style="display:none">
     <div class="summary" id="results-summary"></div>
-    <button class="btn btn-success" onclick="exportApproved()">⬇ Approved Changes</button>
-    <button class="btn btn-secondary" onclick="exportFullJSON()">⬇ Full JSON</button>
+    <div class="export-wrap">
+      <button class="btn btn-secondary" onclick="toggleExport(event)">⬇ Export ▾</button>
+      <div class="export-dropdown" id="export-dd">
+        <button onclick="exportPDF()">📄 PDF Report</button>
+        <button onclick="exportWord()">📝 Word (.doc)</button>
+        <button onclick="exportCSV()">📊 CSV</button>
+        <div class="sep"></div>
+        <button onclick="exportApproved()">✓ Approved changes (.txt)</button>
+        <button onclick="exportFullJSON()">⚙ Full JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resend card (results mode) -->
+  <div class="resend-card" id="resend-card" style="display:none">
+    <h3>↻ Send for Another Round of Review</h3>
+    <p class="help">Create a new review session from this report. Useful when corrections have been made and need a second pass.</p>
+    <div class="resend-options">
+      <button class="btn btn-secondary" onclick="resendReview('all')">
+        📋 Resend all <span id="resend-all-count"></span> errors
+      </button>
+      <button class="btn btn-warn" id="resend-unresolved-btn" onclick="resendReview('unresolved')">
+        ⚠ Resend rejected + undecided only (<span id="resend-unresolved-count"></span>)
+      </button>
+    </div>
+    <div id="resend-result" style="display:none;margin-top:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--success);margin-bottom:6px">✓ New session created:</div>
+      <div class="link-box" id="resend-link" onclick="copyText(this.dataset.url)"></div>
+    </div>
   </div>
 
 </div>
 
-<!-- ═══════════════ SETUP ═══════════════ -->
+<!-- ══════════ SETUP ══════════ -->
 <div class="page" id="setup-page">
   <div class="card">
     <h3>⚙️ Supabase Configuration</h3>
-    <p class="help">One-time setup. Create a free project at <a href="https://supabase.com" target="_blank" style="color:var(--primary)">supabase.com</a>, run the SQL below, then paste your credentials.</p>
-
+    <p class="help">One-time setup. Create a free project at <a href="https://supabase.com" target="_blank" style="color:var(--primary)">supabase.com</a>, run the SQL, then paste your credentials.</p>
     <div style="margin-top:16px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px">Step 1 — Run this SQL in your Supabase SQL Editor</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">Step 1 — Run in Supabase SQL Editor</div>
       <div class="sql-block" id="setup-sql">create table public.review_sessions (
   id text primary key,
   report jsonb not null,
@@ -352,27 +396,23 @@ create policy "anon_insert" on public.review_sessions for insert with check (tru
 create policy "anon_update" on public.review_sessions for update using (status = 'pending') with check (true);</div>
       <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="copySQL()">📋 Copy SQL</button>
     </div>
-
     <div class="sep"></div>
-
     <div style="font-size:13px;font-weight:700;margin-bottom:8px">Step 2 — Paste your credentials</div>
-    <p class="help">In Supabase → <strong>Settings → API</strong>. Copy <strong>Project URL</strong> and <strong>anon public</strong> key.</p>
-
+    <p class="help">Supabase → <strong>Settings → API</strong> → Project URL + anon public key.</p>
     <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
       <div>
         <label>Supabase Project URL</label>
-        <input type="text" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off">
+        <input type="text" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
       </div>
       <div>
         <label>Supabase Anon Key (public)</label>
-        <input type="password" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" autocomplete="off">
+        <input type="password" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…">
       </div>
       <div>
-        <label>Your Name (shown to reviewer)</label>
-        <input type="text" id="sb-name" placeholder="e.g. Shakkeer" autocomplete="off">
+        <label>Your Name</label>
+        <input type="text" id="sb-name" placeholder="e.g. Shakkeer">
       </div>
     </div>
-
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="saveSetup()">Save Configuration</button>
       <button class="btn btn-secondary" onclick="testConn()">Test Connection</button>
@@ -384,50 +424,39 @@ create policy "anon_update" on public.review_sessions for update using (status =
 
 <script>
 'use strict';
-// ═══════════════════════════════════════════
-// ★  CREDENTIALS — fill in after Supabase setup
-//    (anon key is public-safe to embed here)
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════
+// ★ Fill these after Supabase setup
+// ══════════════════════════════════════════
 const SB_URL_DEFAULT = 'YOUR_SUPABASE_URL';
 const SB_KEY_DEFAULT = 'YOUR_ANON_KEY';
 
-// ═══════════════════════════════════════════
-// Type colours (matches main proofreader)
-// ═══════════════════════════════════════════
 const TYPE_COLORS = {
   Typos:'#ef4444', Spelling:'#f97316', Grammar:'#f59e0b',
   Punctuation:'#10b981', Capitalization:'#3b82f6',
   Style:'#8b5cf6', Consistency:'#06b6d4', Clarity:'#ec4899'
 };
 
-// ═══════════════════════════════════════════
-// State
-// ═══════════════════════════════════════════
-let _sbUrl  = '';
-let _sbKey  = '';
-let _myName = '';
-let _report      = null;  // last proofread report (from localStorage)
-let _session     = null;  // session object from Supabase
-let _sessionId   = null;
-let _decisions   = {};    // { errorId: { decision, suggestion } }
-let _filter      = 'all';
-let _isResults   = false;
+// ── State ──────────────────────────────────
+let _sbUrl = '', _sbKey = '', _myName = '';
+let _report    = null;
+let _session   = null;
+let _sessionId = null;
+let _decisions = {};
+let _isResults = false;
 
-// ═══════════════════════════════════════════
-// Supabase REST helpers
-// ═══════════════════════════════════════════
-function _sbHeaders() {
-  return {
-    'apikey': _sbKey,
-    'Authorization': `Bearer ${_sbKey}`,
-    'Content-Type': 'application/json'
-  };
+let _filterDec  = 'all';
+let _filterType = 'all';
+let _filterSev  = 'all';
+
+// ── Supabase helpers ───────────────────────
+function _h() {
+  return { 'apikey': _sbKey, 'Authorization': `Bearer ${_sbKey}`, 'Content-Type': 'application/json' };
 }
 
 async function sbInsert(row) {
   const r = await fetch(`${_sbUrl}/rest/v1/review_sessions`, {
     method: 'POST',
-    headers: { ..._sbHeaders(), 'Prefer': 'return=representation' },
+    headers: { ..._h(), 'Prefer': 'return=representation' },
     body: JSON.stringify(row)
   });
   if (!r.ok) throw new Error(`Insert failed: ${r.status} ${await r.text()}`);
@@ -437,7 +466,7 @@ async function sbInsert(row) {
 async function sbGet(id) {
   const r = await fetch(
     `${_sbUrl}/rest/v1/review_sessions?id=eq.${encodeURIComponent(id)}&select=*`,
-    { headers: _sbHeaders() }
+    { headers: _h() }
   );
   if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
   const rows = await r.json();
@@ -447,11 +476,7 @@ async function sbGet(id) {
 async function sbPatch(id, data) {
   const r = await fetch(
     `${_sbUrl}/rest/v1/review_sessions?id=eq.${encodeURIComponent(id)}`,
-    {
-      method: 'PATCH',
-      headers: { ..._sbHeaders(), 'Prefer': 'return=representation' },
-      body: JSON.stringify(data)
-    }
+    { method: 'PATCH', headers: { ..._h(), 'Prefer': 'return=representation' }, body: JSON.stringify(data) }
   );
   if (!r.ok) throw new Error(`Update failed: ${r.status} ${await r.text()}`);
   return r.json();
@@ -459,32 +484,22 @@ async function sbPatch(id, data) {
 
 async function sbListMine(ids) {
   if (!ids.length) return [];
-  const filter = ids.map(id => `id.eq.${encodeURIComponent(id)}`).join(',');
+  const q = ids.map(id => `id.eq.${encodeURIComponent(id)}`).join(',');
   const r = await fetch(
-    `${_sbUrl}/rest/v1/review_sessions?or=(${filter})&select=id,doc_name,initiated_by,created_at,status,reviewed_by`,
-    { headers: _sbHeaders() }
+    `${_sbUrl}/rest/v1/review_sessions?or=(${q})&select=id,doc_name,initiated_by,created_at,status,reviewed_by`,
+    { headers: _h() }
   );
-  if (!r.ok) return [];
-  return r.json();
+  return r.ok ? r.json() : [];
 }
 
-// ═══════════════════════════════════════════
-// Utils
-// ═══════════════════════════════════════════
-function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// ── Utilities ──────────────────────────────
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function toast(msg, type = 'ok') {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `show ${type}`;
-  clearTimeout(t._t);
-  t._t = setTimeout(() => t.classList.remove('show'), 3200);
+  t.textContent = msg; t.className = `show ${type}`;
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3200);
 }
 
 function setLoading(on, msg = 'Loading…') {
@@ -493,7 +508,7 @@ function setLoading(on, msg = 'Loading…') {
 }
 
 function showPage(name) {
-  ['dash', 'review', 'setup'].forEach(p => {
+  ['dash','review','setup'].forEach(p => {
     document.getElementById(p + '-page').classList.toggle('active', p === name);
   });
   document.querySelectorAll('.header-tab').forEach(b => b.classList.remove('active'));
@@ -502,18 +517,11 @@ function showPage(name) {
 }
 
 function copyText(text) {
-  navigator.clipboard.writeText(text)
-    .then(() => toast('Copied!'))
-    .catch(() => {
-      // fallback
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-      toast('Copied!');
-    });
+  navigator.clipboard.writeText(text).then(() => toast('Copied!')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); toast('Copied!');
+  });
 }
 
 function fmtDate(iso) {
@@ -521,22 +529,15 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
 }
 
-function fmtDateTime(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-}
-
-function dlBlob(blob, filename) {
+function dlBlob(blob, name) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-// ═══════════════════════════════════════════
-// Credentials / Config
-// ═══════════════════════════════════════════
+function safeName(s) { return (s||'review').replace(/[^a-z0-9]/gi,'_'); }
+
+// ── Config ─────────────────────────────────
 function loadConfig() {
   _sbUrl  = localStorage.getItem('review_sb_url')  || SB_URL_DEFAULT;
   _sbKey  = localStorage.getItem('review_sb_key')  || SB_KEY_DEFAULT;
@@ -552,159 +553,114 @@ function saveSetup() {
   const key  = document.getElementById('sb-key').value.trim();
   const name = document.getElementById('sb-name').value.trim();
   if (!url || !key) { toast('Enter both URL and key.', 'warn'); return; }
-  localStorage.setItem('review_sb_url',  url);
-  localStorage.setItem('review_sb_key',  key);
+  localStorage.setItem('review_sb_url', url);
+  localStorage.setItem('review_sb_key', key);
   localStorage.setItem('review_sb_name', name);
-  _sbUrl  = url;
-  _sbKey  = key;
-  _myName = name;
+  _sbUrl = url; _sbKey = key; _myName = name;
   toast('Configuration saved!');
-  showPage('dash');
-  checkConfig();
+  showPage('dash'); checkConfig();
 }
 
 async function testConn() {
   const url = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
   const key = document.getElementById('sb-key').value.trim();
   if (!url || !key) { toast('Enter URL and key first.', 'warn'); return; }
-  setLoading(true, 'Testing connection…');
+  setLoading(true, 'Testing…');
   try {
     const r = await fetch(`${url}/rest/v1/review_sessions?limit=1`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
     });
-    if (r.status === 200 || r.status === 206) {
-      toast('✓ Connection successful!');
-    } else if (r.status === 404) {
-      toast('Table not found — run the SQL first.', 'warn');
-    } else {
-      toast(`Error ${r.status} — check your URL and key.`, 'err');
-    }
-  } catch(e) {
-    toast('Connection failed: ' + e.message, 'err');
-  } finally {
-    setLoading(false);
-  }
+    if (r.status === 200 || r.status === 206) toast('✓ Connection successful!');
+    else if (r.status === 404) toast('Table not found — run the SQL first.', 'warn');
+    else toast(`Error ${r.status}`, 'err');
+  } catch(e) { toast('Connection failed: ' + e.message, 'err'); }
+  finally { setLoading(false); }
 }
 
-function copySQL() {
-  copyText(document.getElementById('setup-sql').textContent);
-}
-
+function copySQL() { copyText(document.getElementById('setup-sql').textContent); }
 function checkConfig() {
-  const banner = document.getElementById('setup-banner');
-  if (banner) banner.style.display = isConfigured() ? 'none' : 'block';
+  const b = document.getElementById('setup-banner');
+  if (b) b.style.display = isConfigured() ? 'none' : 'block';
 }
 
-// ═══════════════════════════════════════════
-// Dashboard — load last report from localStorage
-// ═══════════════════════════════════════════
+// ── Doc name helper ────────────────────────
+// Main app doesn't save _doc_name in the report — read from proof_history instead
+function resolveDocName(report) {
+  if (report && report._doc_name) return report._doc_name;
+  try {
+    const h = JSON.parse(localStorage.getItem('proof_history') || '[]');
+    if (h.length && h[0].filename) return h[0].filename;
+  } catch(e) {}
+  return 'Untitled';
+}
+
+// ── Dashboard ──────────────────────────────
 function loadLastReport() {
-  const area  = document.getElementById('report-preview-area');
-  const btn   = document.getElementById('share-btn');
-  const hint  = document.getElementById('share-btn-hint');
+  const area = document.getElementById('report-preview-area');
+  const btn  = document.getElementById('share-btn');
+  const hint = document.getElementById('share-hint');
 
   try {
     const raw = localStorage.getItem('proof_last_report');
     if (!raw) {
-      area.innerHTML = `<div class="empty-state">
-        No report found.<br><br>
-        Go to the <a href="index.html" style="color:var(--primary)">main proofreader</a>,
-        proofread a document, then come back here to share it.
-      </div>`;
+      area.innerHTML = `<div class="empty-state">No report found.<br><br>
+        Go to <a href="index.html" style="color:var(--primary)">the proofreader</a>, proofread a document, then return here.</div>`;
       hint.textContent = 'Proofread a document first.';
       return;
     }
 
     const data = JSON.parse(raw);
-    const report = data.report || data; // handle both {report, retryInfo} and raw report
+    const report = data.report || data;
     _report = report;
 
-    const docName  = report._doc_name  || 'Untitled';
+    const docName  = resolveDocName(report);
     const initBy   = report._initiated_by || _myName || '—';
     const errCount = (report.errors || []).length;
     const lang     = report.language || '—';
-    const model    = report._model ? report._model.replace('claude-', 'Claude ') : '—';
+    const model    = report._model ? report._model.replace('claude-','Claude ') : '—';
 
     area.innerHTML = `
       <div class="report-preview">
-        <div class="report-preview-meta">
-          <div class="rp-field">
-            <div class="rp-label">Document</div>
-            <div class="rp-value">${esc(docName)}</div>
-          </div>
-          <div class="rp-field">
-            <div class="rp-label">Issues Found</div>
-            <div class="rp-value" style="color:var(--warning)">${errCount}</div>
-          </div>
-          <div class="rp-field">
-            <div class="rp-label">Language</div>
-            <div class="rp-value">${esc(lang)}</div>
-          </div>
-          <div class="rp-field">
-            <div class="rp-label">Model</div>
-            <div class="rp-value">${esc(model)}</div>
-          </div>
-          <div class="rp-field">
-            <div class="rp-label">Initiated By</div>
-            <div class="rp-value">${esc(initBy)}</div>
-          </div>
+        <div class="rp-meta">
+          <div><div class="rp-label">Document</div><div class="rp-value">${esc(docName)}</div></div>
+          <div><div class="rp-label">Issues Found</div><div class="rp-value" style="color:var(--warning)">${errCount}</div></div>
+          <div><div class="rp-label">Language</div><div class="rp-value">${esc(lang)}</div></div>
+          <div><div class="rp-label">Model</div><div class="rp-value">${esc(model)}</div></div>
+          <div><div class="rp-label">Initiated By</div><div class="rp-value">${esc(initBy)}</div></div>
         </div>
       </div>`;
-
     btn.disabled = false;
-    hint.textContent = 'Creates a shareable link instantly — no download needed.';
-
+    hint.textContent = 'Creates a shareable link instantly — no export needed.';
   } catch(e) {
-    area.innerHTML = `<div class="empty-state" style="color:var(--danger)">Could not read last report. Error: ${esc(e.message)}</div>`;
+    area.innerHTML = `<div class="empty-state" style="color:var(--danger)">Error reading report: ${esc(e.message)}</div>`;
   }
 }
 
-// ═══════════════════════════════════════════
-// Create session
-// ═══════════════════════════════════════════
 async function createSession() {
-  if (!isConfigured()) {
-    toast('Configure Supabase in Setup tab first.', 'warn');
-    showPage('setup');
-    return;
-  }
+  if (!isConfigured()) { toast('Configure Supabase in Setup tab first.', 'warn'); showPage('setup'); return; }
   if (!_report) { toast('No report loaded.', 'warn'); return; }
-
   setLoading(true, 'Creating review link…');
   try {
-    const id = genId();
-    const docName    = _report._doc_name  || 'Untitled';
+    const id          = genId();
+    const docName     = resolveDocName(_report);
     const initiatedBy = _report._initiated_by || _myName || '';
-    const modelName   = _report._model || '';
-
     await sbInsert({
-      id,
-      report:       _report,
-      doc_name:     docName,
-      initiated_by: initiatedBy || _myName || '',
-      model_name:   modelName,
-      expires_at:   new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+      id, report: _report,
+      doc_name: docName, initiated_by: initiatedBy, model_name: _report._model || '',
+      expires_at: new Date(Date.now() + 30*24*3600*1000).toISOString()
     });
-
     const link = `${location.origin}${location.pathname}?r=${id}`;
     const box  = document.getElementById('new-link');
-    box.textContent  = link;
-    box.dataset.url  = link;
-    document.getElementById('created-link-wrap').style.display = 'block';
-
+    box.textContent = link; box.dataset.url = link;
+    document.getElementById('new-link-wrap').style.display = 'block';
     saveSessionLocal(id, docName, initiatedBy, new Date().toISOString());
     renderSessions();
     toast('Review link created! 🎉');
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-  } finally {
-    setLoading(false);
-  }
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+  finally { setLoading(false); }
 }
 
-// ═══════════════════════════════════════════
-// Local session list
-// ═══════════════════════════════════════════
+// ── Session list ───────────────────────────
 function saveSessionLocal(id, docName, initiatedBy, createdAt) {
   try {
     const list = JSON.parse(localStorage.getItem('sr_sessions') || '[]');
@@ -716,8 +672,7 @@ function saveSessionLocal(id, docName, initiatedBy, createdAt) {
 }
 
 function getSessionsLocal() {
-  try { return JSON.parse(localStorage.getItem('sr_sessions') || '[]'); }
-  catch(e) { return []; }
+  try { return JSON.parse(localStorage.getItem('sr_sessions') || '[]'); } catch(e) { return []; }
 }
 
 async function refreshSessions() {
@@ -728,102 +683,73 @@ async function refreshSessions() {
   try {
     const remote = await sbListMine(list.map(s => s.id));
     remote.forEach(r => {
-      const local = list.find(s => s.id === r.id);
-      if (local) {
-        local.status     = r.status;
-        local.reviewedBy = r.reviewed_by;
-        local.docName    = r.doc_name || local.docName;
-      }
+      const loc = list.find(s => s.id === r.id);
+      if (loc) { loc.status = r.status; loc.reviewedBy = r.reviewed_by; loc.docName = r.doc_name || loc.docName; }
     });
     localStorage.setItem('sr_sessions', JSON.stringify(list));
-    renderSessions();
-    toast('Refreshed!');
-  } catch(e) {
-    toast('Refresh error: ' + e.message, 'err');
-  } finally {
-    setLoading(false);
-  }
+    renderSessions(); toast('Refreshed!');
+  } catch(e) { toast('Refresh error: ' + e.message, 'err'); }
+  finally { setLoading(false); }
 }
 
 function renderSessions() {
   const list = getSessionsLocal();
   const el   = document.getElementById('sessions-list');
   if (!list.length) {
-    el.innerHTML = '<div class="empty-state">No sessions yet.<br>Create a review link above to get started.</div>';
+    el.innerHTML = '<div class="empty-state">No sessions yet. Create a review link above.</div>';
     return;
   }
   el.innerHTML = list.map(s => {
-    const isReviewed = s.status === 'reviewed';
+    const reviewed = s.status === 'reviewed';
     const link = `${location.origin}${location.pathname}?r=${s.id}`;
-    return `
-    <div class="session-item">
-      <div class="session-item-info">
-        <div class="session-item-title">${esc(s.docName || 'Untitled')}</div>
-        <div class="session-item-meta">
-          ${s.initiatedBy ? esc(s.initiatedBy) + ' · ' : ''}${fmtDate(s.createdAt)}
-          ${isReviewed && s.reviewedBy ? ' · Reviewed by ' + esc(s.reviewedBy) : ''}
-        </div>
+    return `<div class="session-item">
+      <div class="si-info">
+        <div class="si-title">${esc(s.docName || 'Untitled')}</div>
+        <div class="si-meta">${s.initiatedBy ? esc(s.initiatedBy)+' · ' : ''}${fmtDate(s.createdAt)}${reviewed && s.reviewedBy ? ' · Reviewed by '+esc(s.reviewedBy) : ''}</div>
       </div>
-      <div class="session-item-actions">
-        <span class="badge ${isReviewed ? 'badge-reviewed' : 'badge-pending'}">
-          ${isReviewed ? '✓ Reviewed' : 'Pending'}
-        </span>
-        <button class="btn btn-secondary btn-sm" onclick="window.location.href='?r=${s.id}'">
-          ${isReviewed ? '👁 Results' : '🔗 Open'}
-        </button>
-        <button class="btn btn-secondary btn-sm" title="Copy link" onclick="copyText('${esc(link)}')">📋</button>
+      <div class="si-actions">
+        <span class="badge ${reviewed ? 'badge-reviewed':'badge-pending'}">${reviewed ? '✓ Reviewed':'Pending'}</span>
+        <button class="btn btn-secondary btn-sm" onclick="window.location.href='?r=${s.id}'">${reviewed ? '👁 Results' : '🔗 Open'}</button>
+        <button class="btn btn-secondary btn-sm" title="Copy link" onclick="copyText('${link.replace(/'/g,"\\'")}')">📋</button>
       </div>
     </div>`;
   }).join('');
 }
 
-// ═══════════════════════════════════════════
-// Load review session (?r=ID)
-// ═══════════════════════════════════════════
+// ── Load review session ────────────────────
 async function loadReviewSession(id) {
   setLoading(true, 'Loading session…');
   try {
-    // If we have no credentials at all, show the one-time reviewer setup prompt
-    if (!isConfigured()) {
-      setLoading(false);
-      showReviewerKeyPrompt(id);
-      return;
-    }
+    if (!isConfigured()) { setLoading(false); showReviewerKeyPrompt(id); return; }
     const row = await sbGet(id);
     if (!row) {
       document.getElementById('review-page').innerHTML =
         `<div class="card" style="margin-top:24px;text-align:center">
            <p style="font-size:15px;font-weight:700;margin-bottom:8px">Session not found</p>
            <p class="help">This session may have expired or the link is incorrect.</p>
-           <a href="${location.pathname}" class="btn btn-primary" style="margin-top:14px;display:inline-flex">← Back to Dashboard</a>
+           <a href="${location.pathname}" class="btn btn-primary" style="margin-top:14px;display:inline-flex">← Back</a>
          </div>`;
       document.getElementById('review-page').classList.add('active');
       document.getElementById('header-tabs').style.display = 'none';
       return;
     }
-
     _session   = row;
     _sessionId = id;
     _isResults = row.status === 'reviewed';
     _decisions = _isResults
-      ? (typeof row.decisions === 'string' ? JSON.parse(row.decisions) : row.decisions || {})
+      ? (typeof row.decisions === 'string' ? JSON.parse(row.decisions) : (row.decisions || {}))
       : {};
-
     renderReviewPage();
-  } catch(e) {
-    toast('Error loading session: ' + e.message, 'err');
-  } finally {
-    setLoading(false);
-  }
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+  finally { setLoading(false); }
 }
 
-// Reviewer on a fresh browser: ask for the Supabase key once
 function showReviewerKeyPrompt(sessionId) {
   document.getElementById('header-tabs').style.display = 'none';
   document.getElementById('review-page').innerHTML = `
     <div class="card" style="max-width:460px;margin:32px auto">
       <h3>🔑 Enter access key to view this review</h3>
-      <p class="help" style="margin:10px 0 16px">The person who sent you this link will provide the Supabase URL and key. This is saved locally and only needed once.</p>
+      <p class="help" style="margin:10px 0 16px">Ask the person who shared this link for the Supabase URL and anon key. Saved locally — only needed once on this browser.</p>
       <label>Supabase Project URL</label>
       <input type="text" id="rv-sb-url" placeholder="https://xxxx.supabase.co" style="margin-bottom:10px">
       <label>Supabase Anon Key</label>
@@ -833,77 +759,36 @@ function showReviewerKeyPrompt(sessionId) {
   document.getElementById('review-page').classList.add('active');
 }
 
-async function saveReviewerKey(sessionId) {
+async function saveReviewerKey(sid) {
   const url = document.getElementById('rv-sb-url')?.value.trim().replace(/\/$/, '');
   const key = document.getElementById('rv-sb-key')?.value.trim();
   if (!url || !key) { toast('Enter both fields.', 'warn'); return; }
   localStorage.setItem('review_sb_url', url);
   localStorage.setItem('review_sb_key', key);
   _sbUrl = url; _sbKey = key;
-  // Re-build the review page structure then load
-  document.getElementById('review-page').innerHTML = _reviewPageHTML();
-  await loadReviewSession(sessionId);
+  document.getElementById('review-page').innerHTML = _rvHTML();
+  await loadReviewSession(sid);
 }
 
-function _reviewPageHTML() {
-  return `
-    <div id="rv-header"></div>
-    <div class="reviewer-bar" id="rv-name-bar">
-      <label>Your name:</label>
-      <input type="text" id="rv-name" placeholder="Enter your name before submitting…">
-    </div>
-    <div class="progress-row" id="rv-progress">
-      <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
-      <div class="progress-label" id="prog-label">0 / 0 reviewed</div>
-    </div>
-    <div class="filter-bar">
-      <span class="filter-label">FILTER:</span>
-      <button class="filt-btn f-all on"    onclick="applyFilter('all',this)">All</button>
-      <button class="filt-btn f-approved"  onclick="applyFilter('approved',this)">✓ Approved</button>
-      <button class="filt-btn f-rejected"  onclick="applyFilter('rejected',this)">✗ Rejected</button>
-      <button class="filt-btn f-suggested" onclick="applyFilter('suggested',this)">✎ Suggested</button>
-      <button class="filt-btn f-pending"   onclick="applyFilter('pending',this)">Undecided</button>
-    </div>
-    <div class="results-stats" id="results-stats" style="display:none"></div>
-    <div class="table-wrap">
-      <table>
-        <colgroup>
-          <col class="c-num"><col class="c-type"><col class="c-pg">
-          <col class="c-orig"><col class="c-corr"><col class="c-expl"><col class="c-dec">
-        </colgroup>
-        <thead>
-          <tr><th>#</th><th>Type</th><th>Pg</th><th>Original</th><th>Corrected</th><th>Explanation</th><th id="dec-th">Your Decision</th></tr>
-        </thead>
-        <tbody id="rv-tbody"></tbody>
-      </table>
-    </div>
-    <div class="bottom-bar" id="submit-bar">
-      <div class="summary" id="submit-summary">Make decisions above, then submit.</div>
-      <button class="btn btn-primary" id="submit-btn" onclick="submitReview()" disabled>Submit Review</button>
-    </div>
-    <div class="bottom-bar" id="results-bar" style="display:none">
-      <div class="summary" id="results-summary"></div>
-      <button class="btn btn-success" onclick="exportApproved()">⬇ Approved Changes</button>
-      <button class="btn btn-secondary" onclick="exportFullJSON()">⬇ Full JSON</button>
-    </div>`;
+function _rvHTML() {
+  return document.querySelector('#review-page').outerHTML
+    .replace(/<div class="page"[^>]*id="review-page"[^>]*>/, '')
+    .replace(/<\/div>\s*$/, '');
 }
 
-// ═══════════════════════════════════════════
-// Render review / results page
-// ═══════════════════════════════════════════
+// ── Render review page ─────────────────────
 function renderReviewPage() {
-  const s = _session;
+  const s      = _session;
   const report = s.report || {};
   const errors = report.errors || [];
 
   // Header
   const hdr = document.getElementById('rv-header');
   if (hdr) {
-    const typeSummary = Object.entries(report.summary || {})
+    const typeChips = Object.entries(report.summary || {})
       .filter(([k,v]) => k !== 'total_errors' && v > 0)
       .map(([k,v]) => `<div class="chip" style="color:${TYPE_COLORS[k]||'inherit'}">${v} <span>${k}</span></div>`)
       .join('');
-
     hdr.innerHTML = `
       <div class="review-header">
         <h2>📋 ${esc(s.doc_name || 'Proofreading Review')}</h2>
@@ -912,43 +797,68 @@ function renderReviewPage() {
           ${fmtDate(s.created_at)}
           ${s.model_name ? ` · ${esc(s.model_name.replace('claude-','Claude '))}` : ''}
           ${report.language ? ` · ${esc(report.language)}` : ''}
-          ${_isResults
-            ? ` · <span style="color:var(--success)">✓ Reviewed by <strong>${esc(s.reviewed_by)}</strong> — ${fmtDate(s.reviewed_at)}</span>`
-            : ''}
+          ${_isResults ? ` · <span style="color:var(--success)">✓ Reviewed by <strong>${esc(s.reviewed_by)}</strong> — ${fmtDate(s.reviewed_at)}</span>` : ''}
         </div>
         <div class="chips">
           <div class="chip">${errors.length} <span>issues</span></div>
-          ${typeSummary}
+          ${typeChips}
         </div>
       </div>`;
   }
 
-  // Results mode stats
+  // Build type filter buttons dynamically
+  const types = [...new Set(errors.map(e => e.type).filter(Boolean))].sort();
+  const typeBtnsEl = document.getElementById('type-filter-btns');
+  if (typeBtnsEl) {
+    typeBtnsEl.innerHTML = types.map(t => {
+      const c = TYPE_COLORS[t] || '#8b8fa8';
+      return `<button class="filt-btn" style="color:${c};border-color:${c}44"
+        onclick="setFilter('type','${t}',this)">${t}</button>`;
+    }).join('');
+  }
+
+  // Results stats
   if (_isResults) {
-    const approved  = Object.values(_decisions).filter(d => d.decision === 'approved').length;
-    const rejected  = Object.values(_decisions).filter(d => d.decision === 'rejected').length;
-    const suggested = Object.values(_decisions).filter(d => d.decision === 'suggested').length;
-    const pending   = errors.length - approved - rejected - suggested;
+    const app = Object.values(_decisions).filter(d => d.decision==='approved').length;
+    const rej = Object.values(_decisions).filter(d => d.decision==='rejected').length;
+    const sug = Object.values(_decisions).filter(d => d.decision==='suggested').length;
+    const pen = errors.length - app - rej - sug;
     const rsEl = document.getElementById('results-stats');
     if (rsEl) {
       rsEl.style.display = 'flex';
       rsEl.innerHTML = `
-        <div class="stat-box stat-approved"><div class="num">${approved}</div><div class="lbl">Approved</div></div>
-        <div class="stat-box stat-rejected"><div class="num">${rejected}</div><div class="lbl">Rejected</div></div>
-        <div class="stat-box stat-suggested"><div class="num">${suggested}</div><div class="lbl">Suggested</div></div>
-        <div class="stat-box stat-pending"><div class="num">${pending}</div><div class="lbl">No Decision</div></div>`;
+        <div class="stat-box stat-approved"><div class="num">${app}</div><div class="lbl">Approved</div></div>
+        <div class="stat-box stat-rejected"><div class="num">${rej}</div><div class="lbl">Rejected</div></div>
+        <div class="stat-box stat-suggested"><div class="num">${sug}</div><div class="lbl">Suggested</div></div>
+        <div class="stat-box stat-pending"><div class="num">${pen}</div><div class="lbl">No Decision</div></div>`;
     }
+
+    // Results bar summary
     const rsBar = document.getElementById('results-bar');
     const rsSummary = document.getElementById('results-summary');
     if (rsBar) rsBar.style.display = 'flex';
     if (rsSummary) rsSummary.innerHTML =
-      `<strong style="color:var(--success)">${approved} approved</strong> · ` +
-      `<strong style="color:var(--danger)">${rejected} rejected</strong> · ` +
-      `<strong style="color:var(--warning)">${suggested} suggestions</strong>` +
-      (pending > 0 ? ` · ${pending} no decision` : '');
+      `<strong style="color:var(--success)">${app} approved</strong> · ` +
+      `<strong style="color:var(--danger)">${rej} rejected</strong> · ` +
+      `<strong style="color:var(--warning)">${sug} suggestions</strong>` +
+      (pen > 0 ? ` · ${pen} no decision` : '');
+
+    // Resend card
+    const resendCard = document.getElementById('resend-card');
+    if (resendCard) {
+      resendCard.style.display = 'block';
+      const unresolved = errors.filter(e => {
+        const d = _decisions[String(e.id)];
+        return !d || d.decision === 'rejected';
+      }).length;
+      document.getElementById('resend-all-count').textContent = errors.length;
+      document.getElementById('resend-unresolved-count').textContent = unresolved;
+      const unBtn = document.getElementById('resend-unresolved-btn');
+      if (unBtn) unBtn.disabled = unresolved === 0;
+    }
   }
 
-  // Hide/show UI elements
+  // Show/hide UI per mode
   const nameBar   = document.getElementById('rv-name-bar');
   const submitBar = document.getElementById('submit-bar');
   const progress  = document.getElementById('rv-progress');
@@ -969,27 +879,26 @@ function renderReviewPage() {
 function buildRow(e) {
   const color = TYPE_COLORS[e.type] || '#8b8fa8';
   const dec   = _decisions[String(e.id)];
-  const rowClass = dec ? `row-${dec.decision}` : '';
+  const rowCls = dec ? `row-${dec.decision}` : '';
+  const sev   = e.severity || 'Minor';
 
   const typeCell = `
     <div class="type-badge" style="background:${color}22;color:${color}">${esc(e.type)}</div>
-    <div class="sev-badge sev-${e.severity || 'Minor'}">${e.severity || 'Minor'}</div>`;
+    <div class="sev-badge sev-${sev}">${sev}</div>`;
 
   if (_isResults) {
     let decHtml = '<span class="dec-label lbl-pending">No decision</span>';
     if (dec) {
-      if (dec.decision === 'approved')
-        decHtml = '<span class="dec-label lbl-approved">✓ Approved</span>';
-      if (dec.decision === 'rejected')
-        decHtml = '<span class="dec-label lbl-rejected">✗ Rejected</span>';
-      if (dec.decision === 'suggested')
-        decHtml = `<span class="dec-label lbl-suggested">✎ Suggestion</span>
-                   <div class="sug-text">${esc(dec.suggestion || '')}</div>`;
+      if (dec.decision === 'approved')  decHtml = '<span class="dec-label lbl-approved">✓ Approved</span>';
+      if (dec.decision === 'rejected')  decHtml = '<span class="dec-label lbl-rejected">✗ Rejected</span>';
+      if (dec.decision === 'suggested') decHtml =
+        `<span class="dec-label lbl-suggested">✎ Suggestion</span>
+         <div class="sug-text">${esc(dec.suggestion||'')}</div>`;
     }
-    return `<tr class="${rowClass}" data-id="${e.id}" data-dec="${dec?.decision || 'pending'}">
+    return `<tr class="${rowCls}" data-id="${e.id}" data-dec="${dec?.decision||'pending'}" data-type="${esc(e.type)}" data-sev="${sev}">
       <td style="color:var(--muted);font-size:11px">${e.id}</td>
       <td>${typeCell}</td>
-      <td class="pg-num">${e.page ? 'p.' + e.page : '—'}</td>
+      <td class="pg-num">${e.page ? 'p.'+e.page : '—'}</td>
       <td class="orig-txt">${esc(e.original)}</td>
       <td class="corr-txt">${esc(e.corrected)}</td>
       <td class="expl-txt">${esc(e.explanation)}</td>
@@ -997,29 +906,24 @@ function buildRow(e) {
     </tr>`;
   }
 
-  // Interactive review mode
-  const sel     = dec?.decision || null;
-  const sugVal  = dec?.suggestion || '';
-  return `<tr class="${rowClass}" data-id="${e.id}" data-dec="${sel || 'pending'}">
+  const sel    = dec?.decision || null;
+  const sugVal = dec?.suggestion || '';
+  return `<tr class="${rowCls}" data-id="${e.id}" data-dec="${sel||'pending'}" data-type="${esc(e.type)}" data-sev="${sev}">
     <td style="color:var(--muted);font-size:11px">${e.id}</td>
     <td>${typeCell}</td>
-    <td class="pg-num">${e.page ? 'p.' + e.page : '—'}</td>
+    <td class="pg-num">${e.page ? 'p.'+e.page : '—'}</td>
     <td class="orig-txt">${esc(e.original)}</td>
     <td class="corr-txt">${esc(e.corrected)}</td>
     <td class="expl-txt">${esc(e.explanation)}</td>
     <td>
       <div class="dec-cell">
         <div class="dec-btns">
-          <button class="dec-btn approve ${sel==='approved'?'sel':''}"
-            onclick="setDecision(${e.id},'approved',this)">✓ Approve</button>
-          <button class="dec-btn reject ${sel==='rejected'?'sel':''}"
-            onclick="setDecision(${e.id},'rejected',this)">✗ Reject</button>
-          <button class="dec-btn suggest ${sel==='suggested'?'sel':''}"
-            onclick="setDecision(${e.id},'suggested',this)">✎ Suggest</button>
+          <button class="dec-btn approve ${sel==='approved'?'sel':''}" onclick="setDecision(${e.id},'approved',this)">✓ Approve</button>
+          <button class="dec-btn reject  ${sel==='rejected'?'sel':''}" onclick="setDecision(${e.id},'rejected',this)">✗ Reject</button>
+          <button class="dec-btn suggest ${sel==='suggested'?'sel':''}" onclick="setDecision(${e.id},'suggested',this)">✎ Suggest</button>
         </div>
         <textarea class="suggest-input ${sel==='suggested'?'show':''}"
-          id="sug-${e.id}" rows="2"
-          placeholder="Enter your alternative correction…"
+          id="sug-${e.id}" rows="2" placeholder="Enter your alternative correction…"
           oninput="updateSuggestion(${e.id},this.value)"
         >${esc(sugVal)}</textarea>
       </div>
@@ -1027,26 +931,22 @@ function buildRow(e) {
   </tr>`;
 }
 
-// ═══════════════════════════════════════════
-// Decisions
-// ═══════════════════════════════════════════
+// ── Decisions ──────────────────────────────
 function setDecision(errorId, decision, btn) {
   const id  = String(errorId);
   const row = document.querySelector(`tr[data-id="${errorId}"]`);
   if (!row) return;
-  const allBtns = row.querySelectorAll('.dec-btn');
+  const allBtns  = row.querySelectorAll('.dec-btn');
   const sugInput = document.getElementById(`sug-${errorId}`);
 
-  // Toggle off
   if (_decisions[id]?.decision === decision) {
     delete _decisions[id];
     allBtns.forEach(b => b.classList.remove('sel'));
+    row.className = `row-${row.dataset.type || ''}`; // keep data attrs
     row.className = '';
     row.dataset.dec = 'pending';
     if (sugInput) sugInput.classList.remove('show');
-    updateProgress();
-    _applyFilter();
-    return;
+    updateProgress(); _applyFilters(); return;
   }
 
   _decisions[id] = { decision, suggestion: sugInput?.value || '' };
@@ -1055,9 +955,7 @@ function setDecision(errorId, decision, btn) {
   row.className = `row-${decision}`;
   row.dataset.dec = decision;
   if (sugInput) sugInput.classList.toggle('show', decision === 'suggested');
-
-  updateProgress();
-  _applyFilter();
+  updateProgress(); _applyFilters();
 }
 
 function updateSuggestion(errorId, value) {
@@ -1079,136 +977,287 @@ function updateProgress() {
   const btn     = document.getElementById('submit-btn');
   const summary = document.getElementById('submit-summary');
   if (btn) btn.disabled = decided === 0;
-  if (summary) {
-    const approved  = Object.values(_decisions).filter(d => d.decision==='approved').length;
-    const rejected  = Object.values(_decisions).filter(d => d.decision==='rejected').length;
-    const suggested = Object.values(_decisions).filter(d => d.decision==='suggested').length;
-    summary.textContent = decided === 0
-      ? 'Make decisions above, then submit.'
-      : `${approved} approved · ${rejected} rejected · ${suggested} suggestions · ${total - decided} undecided`;
+  if (summary && decided > 0) {
+    const app = Object.values(_decisions).filter(d => d.decision==='approved').length;
+    const rej = Object.values(_decisions).filter(d => d.decision==='rejected').length;
+    const sug = Object.values(_decisions).filter(d => d.decision==='suggested').length;
+    summary.textContent = `${app} approved · ${rej} rejected · ${sug} suggestions · ${total-decided} undecided`;
   }
 }
 
-// ═══════════════════════════════════════════
-// Filter
-// ═══════════════════════════════════════════
-function applyFilter(f, btn) {
-  _filter = f;
-  document.querySelectorAll('.filt-btn').forEach(b => b.classList.remove('on'));
-  if (btn) btn.classList.add('on');
-  _applyFilter();
+// ── Filters ────────────────────────────────
+function setFilter(dim, val, btn) {
+  if (dim === 'dec')  { _filterDec  = val; _syncBtns('fd-', val, btn); }
+  if (dim === 'type') { _filterType = val; _syncBtns('ft-', val, btn); }
+  if (dim === 'sev')  { _filterSev  = val; _syncBtns('fs-', val, btn); }
+  _applyFilters();
 }
 
-function _applyFilter() {
-  document.querySelectorAll('#rv-tbody tr').forEach(row => {
-    const dec = row.dataset.dec || 'pending';
-    row.classList.toggle('hidden-row', _filter !== 'all' && dec !== _filter);
+function _syncBtns(prefix, val, activeBtn) {
+  // Remove 'on' from all buttons in same group
+  document.querySelectorAll(`.filt-btn[class*="${prefix}"]`).forEach(b => b.classList.remove('on'));
+  // Also handle the "All" button for this group
+  document.querySelectorAll('.filt-btn').forEach(b => {
+    if (b === activeBtn) b.classList.add('on');
   });
+  if (activeBtn) activeBtn.classList.add('on');
 }
 
-// ═══════════════════════════════════════════
-// Submit
-// ═══════════════════════════════════════════
+function _applyFilters() {
+  let visible = 0, total = 0;
+  document.querySelectorAll('#rv-tbody tr').forEach(row => {
+    total++;
+    const dec  = row.dataset.dec  || 'pending';
+    const type = row.dataset.type || '';
+    const sev  = row.dataset.sev  || '';
+    const show =
+      (_filterDec  === 'all' || dec  === _filterDec)  &&
+      (_filterType === 'all' || type === _filterType) &&
+      (_filterSev  === 'all' || sev  === _filterSev);
+    row.classList.toggle('hidden-row', !show);
+    if (show) visible++;
+  });
+  const fc = document.getElementById('filter-count');
+  if (fc) fc.textContent = (visible < total) ? `${visible} of ${total} shown` : '';
+}
+
+// ── Submit ─────────────────────────────────
 async function submitReview() {
   const name = document.getElementById('rv-name')?.value.trim();
-  if (!name) { toast('Enter your name before submitting.', 'warn'); document.getElementById('rv-name')?.focus(); return; }
+  if (!name) { toast('Enter your name first.', 'warn'); document.getElementById('rv-name')?.focus(); return; }
   if (!Object.keys(_decisions).length) { toast('Make at least one decision first.', 'warn'); return; }
-
-  const total = (_session.report?.errors || []).length;
+  const total   = (_session.report?.errors || []).length;
   const decided = Object.keys(_decisions).length;
-  const ok = confirm(
-    `Submit review as "${name}"?\n\n` +
-    `Decisions: ${decided} of ${total} errors reviewed.\n\n` +
-    `Once submitted, the review cannot be changed.`
-  );
-  if (!ok) return;
-
-  setLoading(true, 'Submitting review…');
+  if (!confirm(`Submit review as "${name}"?\n\nDecisions: ${decided} of ${total} errors\n\nOnce submitted, this cannot be changed.`)) return;
+  setLoading(true, 'Submitting…');
   try {
     await sbPatch(_sessionId, {
-      status:      'reviewed',
-      reviewed_by:  name,
-      reviewed_at:  new Date().toISOString(),
-      decisions:    _decisions
+      status: 'reviewed', reviewed_by: name,
+      reviewed_at: new Date().toISOString(), decisions: _decisions
     });
-
-    // Update local list
     const list = getSessionsLocal();
     const s = list.find(x => x.id === _sessionId);
     if (s) { s.status = 'reviewed'; s.reviewedBy = name; localStorage.setItem('sr_sessions', JSON.stringify(list)); }
-
-    toast('Review submitted! Thank you 🎉');
+    toast('Review submitted! 🎉');
     _isResults = true;
-    Object.assign(_session, { status: 'reviewed', reviewed_by: name, reviewed_at: new Date().toISOString(), decisions: _decisions });
+    Object.assign(_session, { status:'reviewed', reviewed_by:name, reviewed_at:new Date().toISOString(), decisions:_decisions });
     renderReviewPage();
-  } catch(e) {
-    toast('Submit error: ' + e.message, 'err');
-  } finally {
-    setLoading(false);
-  }
+  } catch(e) { toast('Submit error: ' + e.message, 'err'); }
+  finally { setLoading(false); }
 }
 
-// ═══════════════════════════════════════════
-// Export
-// ═══════════════════════════════════════════
-function exportApproved() {
-  const s = _session;
-  const errors = (s.report?.errors || []).filter(e => {
-    const d = _decisions[String(e.id)];
-    return d && (d.decision === 'approved' || d.decision === 'suggested');
-  });
+// ── Resend ─────────────────────────────────
+async function resendReview(mode) {
+  if (!_session || !isConfigured()) return;
+  let errors = _session.report?.errors || [];
+  if (mode === 'unresolved') {
+    errors = errors.filter(e => { const d = _decisions[String(e.id)]; return !d || d.decision === 'rejected'; });
+    if (!errors.length) { toast('No rejected or undecided errors.', 'warn'); return; }
+  }
+  const label = mode === 'unresolved'
+    ? `${errors.length} rejected/undecided errors`
+    : `all ${errors.length} errors`;
+  if (!confirm(`Create a new review session with ${label}?`)) return;
+  setLoading(true, 'Creating new session…');
+  try {
+    const id        = genId();
+    const newReport = { ..._session.report, errors };
+    await sbInsert({
+      id, report: newReport,
+      doc_name: _session.doc_name,
+      initiated_by: _myName || _session.initiated_by || '',
+      model_name: _session.model_name || '',
+      expires_at: new Date(Date.now() + 30*24*3600*1000).toISOString()
+    });
+    const link = `${location.origin}${location.pathname}?r=${id}`;
+    saveSessionLocal(id, _session.doc_name, _myName || _session.initiated_by, new Date().toISOString());
 
+    const box = document.getElementById('resend-link');
+    if (box) { box.textContent = link; box.dataset.url = link; }
+    const res = document.getElementById('resend-result');
+    if (res) res.style.display = 'block';
+    toast('New review session created!');
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+  finally { setLoading(false); }
+}
+
+// ── Export: PDF ────────────────────────────
+function exportPDF() {
+  if (typeof window.jspdf === 'undefined') { toast('PDF library not loaded yet — try again.', 'warn'); return; }
+  const { jsPDF } = window.jspdf;
+  const s = _session;
+  const errors = s.report?.errors || [];
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  // Title block
+  doc.setFontSize(15); doc.setFont(undefined,'bold');
+  doc.text(`Proofreading Review — ${s.doc_name || 'Document'}`, 14, 18);
+  doc.setFontSize(9); doc.setFont(undefined,'normal');
+  doc.setTextColor(120);
+  doc.text(`Reviewed by: ${s.reviewed_by || '—'}   Date: ${fmtDate(s.reviewed_at)}`, 14, 25);
+  doc.text(`Shared by: ${s.initiated_by || '—'}   Model: ${(s.model_name||'').replace('claude-','Claude ')}   Language: ${s.report?.language||'—'}`, 14, 30);
+
+  const app = Object.values(_decisions).filter(d=>d.decision==='approved').length;
+  const rej = Object.values(_decisions).filter(d=>d.decision==='rejected').length;
+  const sug = Object.values(_decisions).filter(d=>d.decision==='suggested').length;
+  const pen = errors.length - app - rej - sug;
+  doc.text(`Total: ${errors.length}  ·  Approved: ${app}  ·  Rejected: ${rej}  ·  Suggested: ${sug}  ·  No decision: ${pen}`, 14, 35);
+  doc.setTextColor(0);
+
+  // Table
   const rows = errors.map(e => {
     const d = _decisions[String(e.id)];
-    const finalCorr = d.decision === 'suggested' ? (d.suggestion || e.corrected) : e.corrected;
-    return `| ${e.id} | ${e.type} | p.${e.page||'?'} | ${e.original} | ${finalCorr} | ${e.explanation} |`;
+    const decText = d ? (d.decision.charAt(0).toUpperCase() + d.decision.slice(1) + (d.suggestion ? ' → ' + d.suggestion : '')) : '—';
+    return [e.id, e.type, e.severity||'Minor', e.page?`p.${e.page}`:'—', e.original||'', e.corrected||'', e.explanation||'', decText];
   });
 
-  const text = [
-    `# Approved Changes — ${s.doc_name || 'Document'}`,
-    `Reviewed by: ${s.reviewed_by} on ${fmtDate(s.reviewed_at)}`,
-    `Shared by: ${s.initiated_by || '—'}`,
-    ``,
-    `| # | Type | Page | Original | Corrected | Explanation |`,
-    `|---|------|------|----------|-----------|-------------|`,
-    ...rows,
-    ``,
-    `Total: ${errors.length} of ${(s.report?.errors||[]).length} issues accepted`
-  ].join('\n');
+  doc.autoTable({
+    startY: 40,
+    head: [['#','Type','Sev','Pg','Original','Corrected','Explanation','Decision']],
+    body: rows,
+    styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
+    headStyles: { fillColor: [34,38,58], textColor: [180,180,200], fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 8 }, 1: { cellWidth: 22 }, 2: { cellWidth: 16 },
+      3: { cellWidth: 10 }, 4: { cellWidth: 34 }, 5: { cellWidth: 34 },
+      6: { cellWidth: 'auto' }, 7: { cellWidth: 32 }
+    },
+    alternateRowStyles: { fillColor: [248,248,252] },
+    didParseCell(data) {
+      if (data.section === 'body' && data.column.index === 7) {
+        const t = (data.cell.raw||'').toLowerCase();
+        if (t.startsWith('approved'))  data.cell.styles.textColor = [16,185,129];
+        if (t.startsWith('rejected'))  data.cell.styles.textColor = [239,68,68];
+        if (t.startsWith('suggested')) data.cell.styles.textColor = [245,158,11];
+      }
+    }
+  });
 
-  dlBlob(new Blob([text], { type: 'text/plain' }),
-    `${(s.doc_name||'review').replace(/[^a-z0-9]/gi,'_')}-approved.txt`);
+  doc.save(`${safeName(s.doc_name)}-review.pdf`);
+  toast('PDF exported!');
 }
 
+// ── Export: Word ───────────────────────────
+function exportWord() {
+  const s = _session;
+  const errors = s.report?.errors || [];
+  const app = Object.values(_decisions).filter(d=>d.decision==='approved').length;
+  const rej = Object.values(_decisions).filter(d=>d.decision==='rejected').length;
+  const sug = Object.values(_decisions).filter(d=>d.decision==='suggested').length;
+  const pen = errors.length - app - rej - sug;
+
+  const decColor = { approved:'#059669', rejected:'#dc2626', suggested:'#d97706' };
+
+  const rows = errors.map(e => {
+    const d   = _decisions[String(e.id)];
+    const dec = d ? d.decision : 'pending';
+    const col = decColor[dec] || '#888';
+    const txt = d ? (dec.charAt(0).toUpperCase()+dec.slice(1)+(d.suggestion?' → '+d.suggestion:'')) : 'No decision';
+    return `<tr>
+      <td style="font-size:10pt;color:#666;padding:4px 6px">${e.id}</td>
+      <td style="font-size:10pt;padding:4px 6px">${e.type}</td>
+      <td style="font-size:10pt;padding:4px 6px">${e.severity||'Minor'}</td>
+      <td style="font-size:10pt;padding:4px 6px">${e.page?'p.'+e.page:'—'}</td>
+      <td style="font-size:10pt;color:#b91c1c;padding:4px 6px">${esc(e.original||'')}</td>
+      <td style="font-size:10pt;color:#065f46;padding:4px 6px">${esc(e.corrected||'')}</td>
+      <td style="font-size:10pt;color:#555;padding:4px 6px">${esc(e.explanation||'')}</td>
+      <td style="font-size:10pt;font-weight:bold;color:${col};padding:4px 6px">${esc(txt)}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"><head>
+<meta charset="UTF-8">
+<style>
+body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+h1   { font-size: 16pt; margin-bottom: 4px; }
+p    { margin: 2px 0; font-size: 10pt; color: #444; }
+table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+th { background: #f0f0f5; border: 1px solid #ccc; padding: 5px 8px; font-size: 9pt; text-align: left; }
+td { border: 1px solid #ddd; padding: 4px 6px; vertical-align: top; }
+</style></head><body>
+<h1>Proofreading Review — ${esc(s.doc_name||'Document')}</h1>
+<p>Reviewed by: <b>${esc(s.reviewed_by||'—')}</b> &nbsp;·&nbsp; ${fmtDate(s.reviewed_at)}</p>
+<p>Shared by: <b>${esc(s.initiated_by||'—')}</b> &nbsp;·&nbsp; Model: ${esc((s.model_name||'').replace('claude-','Claude '))}</p>
+<p>Summary: Total ${errors.length} &nbsp;·&nbsp; Approved <b style="color:#059669">${app}</b> &nbsp;·&nbsp; Rejected <b style="color:#dc2626">${rej}</b> &nbsp;·&nbsp; Suggested <b style="color:#d97706">${sug}</b> &nbsp;·&nbsp; No decision ${pen}</p>
+<table>
+<tr><th>#</th><th>Type</th><th>Severity</th><th>Page</th><th>Original</th><th>Corrected</th><th>Explanation</th><th>Decision</th></tr>
+${rows}
+</table>
+</body></html>`;
+
+  dlBlob(new Blob(['﻿'+html], {type:'application/msword'}), `${safeName(s.doc_name)}-review.doc`);
+  toast('Word document exported!');
+}
+
+// ── Export: CSV ────────────────────────────
+function exportCSV() {
+  const s = _session;
+  const errors = s.report?.errors || [];
+  const q = v => `"${String(v??'').replace(/"/g,'""')}"`;
+  const header = ['#','Type','Severity','Page','Original','Corrected','Explanation','Decision','Suggestion'];
+  const rows = errors.map(e => {
+    const d = _decisions[String(e.id)];
+    return [e.id, e.type, e.severity||'Minor', e.page||'', e.original||'', e.corrected||'', e.explanation||'',
+      d?d.decision:'pending', d?.suggestion||''].map(q);
+  });
+  const csv = [header.map(q), ...rows].map(r => r.join(',')).join('\n');
+  dlBlob(new Blob([csv], {type:'text/csv'}), `${safeName(s.doc_name)}-review.csv`);
+  toast('CSV exported!');
+}
+
+// ── Export: Approved changes (.txt) ────────
+function exportApproved() {
+  const s = _session;
+  const errors = (s.report?.errors||[]).filter(e => {
+    const d = _decisions[String(e.id)];
+    return d && (d.decision==='approved' || d.decision==='suggested');
+  });
+  const rows = errors.map(e => {
+    const d = _decisions[String(e.id)];
+    const corr = d.decision==='suggested' ? (d.suggestion||e.corrected) : e.corrected;
+    return `| ${e.id} | ${e.type} | p.${e.page||'?'} | ${e.original} | ${corr} | ${e.explanation} |`;
+  });
+  const txt = [
+    `# Approved Changes — ${s.doc_name||'Document'}`,
+    `Reviewed by: ${s.reviewed_by} on ${fmtDate(s.reviewed_at)}`,``,
+    `| # | Type | Page | Original | Corrected | Explanation |`,
+    `|---|------|------|----------|-----------|-------------|`,
+    ...rows,``,
+    `Total: ${errors.length} of ${(s.report?.errors||[]).length} issues accepted`
+  ].join('\n');
+  dlBlob(new Blob([txt], {type:'text/plain'}), `${safeName(s.doc_name)}-approved.txt`);
+}
+
+// ── Export: Full JSON ──────────────────────
 function exportFullJSON() {
   const s = _session;
   const payload = {
-    doc_name:     s.doc_name,
-    initiated_by: s.initiated_by,
-    reviewed_by:  s.reviewed_by,
-    reviewed_at:  s.reviewed_at,
-    decisions:    _decisions,
-    errors:       s.report?.errors,
+    doc_name: s.doc_name, initiated_by: s.initiated_by,
+    reviewed_by: s.reviewed_by, reviewed_at: s.reviewed_at,
+    decisions: _decisions, errors: s.report?.errors,
     summary: {
-      total:     (s.report?.errors||[]).length,
+      total: (s.report?.errors||[]).length,
       approved:  Object.values(_decisions).filter(d=>d.decision==='approved').length,
       rejected:  Object.values(_decisions).filter(d=>d.decision==='rejected').length,
       suggested: Object.values(_decisions).filter(d=>d.decision==='suggested').length,
     }
   };
-  dlBlob(
-    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
-    `${(s.doc_name||'review').replace(/[^a-z0-9]/gi,'_')}-results.json`
-  );
+  dlBlob(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}), `${safeName(s.doc_name)}-results.json`);
 }
 
-// ═══════════════════════════════════════════
-// Init
-// ═══════════════════════════════════════════
+// ── Export dropdown toggle ─────────────────
+function toggleExport(e) {
+  e.stopPropagation();
+  document.getElementById('export-dd').classList.toggle('open');
+}
+document.addEventListener('click', () => {
+  document.getElementById('export-dd')?.classList.remove('open');
+});
+
+// ── Init ───────────────────────────────────
 (function init() {
   loadConfig();
-
-  // Pre-fill setup form
   const uEl = document.getElementById('sb-url');
   const kEl = document.getElementById('sb-key');
   const nEl = document.getElementById('sb-name');
@@ -1216,15 +1265,13 @@ function exportFullJSON() {
   if (kEl && _sbKey && _sbKey !== SB_KEY_DEFAULT) kEl.value = _sbKey;
   if (nEl && _myName) nEl.value = _myName;
 
-  const params    = new URLSearchParams(location.search);
-  const sessionId = params.get('r');
+  const params = new URLSearchParams(location.search);
+  const sid    = params.get('r');
 
-  if (sessionId) {
-    // Review / results mode
+  if (sid) {
     document.getElementById('header-tabs').style.display = 'none';
-    loadReviewSession(sessionId);
+    loadReviewSession(sid);
   } else {
-    // Dashboard mode
     document.getElementById('header-tabs').style.display = 'flex';
     checkConfig();
     loadLastReport();
