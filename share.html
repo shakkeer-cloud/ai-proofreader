@@ -448,6 +448,8 @@ let _filterDec  = 'all';
 let _filterType = 'all';
 let _filterSev  = 'all';
 
+let _origReviewHTML = '';
+
 // ── Supabase helpers ───────────────────────
 function _h() {
   return { 'apikey': _sbKey, 'Authorization': `Bearer ${_sbKey}`, 'Content-Type': 'application/json' };
@@ -766,14 +768,8 @@ async function saveReviewerKey(sid) {
   localStorage.setItem('review_sb_url', url);
   localStorage.setItem('review_sb_key', key);
   _sbUrl = url; _sbKey = key;
-  document.getElementById('review-page').innerHTML = _rvHTML();
+  document.getElementById('review-page').innerHTML = _origReviewHTML;
   await loadReviewSession(sid);
-}
-
-function _rvHTML() {
-  return document.querySelector('#review-page').outerHTML
-    .replace(/<div class="page"[^>]*id="review-page"[^>]*>/, '')
-    .replace(/<\/div>\s*$/, '');
 }
 
 // ── Render review page ─────────────────────
@@ -942,7 +938,6 @@ function setDecision(errorId, decision, btn) {
   if (_decisions[id]?.decision === decision) {
     delete _decisions[id];
     allBtns.forEach(b => b.classList.remove('sel'));
-    row.className = `row-${row.dataset.type || ''}`; // keep data attrs
     row.className = '';
     row.dataset.dec = 'pending';
     if (sugInput) sugInput.classList.remove('show');
@@ -994,12 +989,11 @@ function setFilter(dim, val, btn) {
 }
 
 function _syncBtns(prefix, val, activeBtn) {
-  // Remove 'on' from all buttons in same group
-  document.querySelectorAll(`.filt-btn[class*="${prefix}"]`).forEach(b => b.classList.remove('on'));
-  // Also handle the "All" button for this group
-  document.querySelectorAll('.filt-btn').forEach(b => {
-    if (b === activeBtn) b.classList.add('on');
-  });
+  if (prefix === 'ft-') {
+    document.querySelectorAll('#type-filter-row .filt-btn').forEach(b => b.classList.remove('on'));
+  } else {
+    document.querySelectorAll(`.filt-btn[class*="${prefix}"]`).forEach(b => b.classList.remove('on'));
+  }
   if (activeBtn) activeBtn.classList.add('on');
 }
 
@@ -1257,6 +1251,7 @@ document.addEventListener('click', () => {
 
 // ── Init ───────────────────────────────────
 (function init() {
+  _origReviewHTML = document.getElementById('review-page').innerHTML;
   loadConfig();
   const uEl = document.getElementById('sb-url');
   const kEl = document.getElementById('sb-key');

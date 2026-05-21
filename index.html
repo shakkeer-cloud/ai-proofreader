@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Explorer AI Proofreader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -487,7 +490,12 @@
             </button>
             <button onclick="exportJSON();closeExportMenu()">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-              Export JSON (for Review)
+              Export JSON
+            </button>
+            <div class="menu-divider"></div>
+            <button onclick="closeExportMenu();window.location.href='share.html'">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              Send for Review →
             </button>
             <div class="menu-divider"></div>
             <button onclick="downloadCorrected();closeExportMenu()">
@@ -1167,6 +1175,12 @@ async function sleepWithCountdown(seconds, onTick) {
   }
 }
 
+function isPolicyError(msg) {
+  const m = (msg||'').toLowerCase();
+  return m.includes('usage policy') || m.includes('aup') || m.includes('violate') ||
+         m.includes('safety') || m.includes('harmful') || m.includes('policy');
+}
+
 async function callApiWithRetry(payload, apiKey, ci, total, showUI) {
   const MAX_RETRIES=3;
   for (let attempt=0; attempt<MAX_RETRIES; attempt++) {
@@ -1187,6 +1201,8 @@ async function callApiWithRetry(payload, apiKey, ci, total, showUI) {
     if (res.ok) return res;
     const e=await res.json().catch(()=>({}));
     const msg=e.error?.message||`API error ${res.status}`;
+    // Policy errors won't be fixed by retrying — throw immediately with a tagged message
+    if (isPolicyError(msg)) throw new Error('POLICY_ERROR: '+msg);
     if (isRateLimitError(msg)&&attempt<MAX_RETRIES-1) continue;
     throw new Error(msg);
   }
@@ -1457,8 +1473,18 @@ Return ONLY valid JSON (no markdown, no extra text):
 
         } catch(chunkErr) {
           const msg = chunkErr.message||'';
-          const isJsonErr = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse') ||
-                            msg.toLowerCase().includes('incomplete');
+          const isJsonErr   = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse') ||
+                              msg.toLowerCase().includes('incomplete');
+          const isPolicyErr = msg.startsWith('POLICY_ERROR:') || isPolicyError(msg);
+
+          // Policy errors: skip this chunk silently and continue — false positives on non-English text
+          if (isPolicyErr) {
+            if (showOnDone) toast(`Chunk ${ci+1} skipped — content safety filter (false positive on non-English text)`, 'warn');
+            chunkDone = true; // treat as "done" so we don't break the outer loop
+            completedChunks++;  // count it as completed (with 0 errors found)
+            break; // exit parseAttempt loop, move to next chunk
+          }
+
           // Auto-retry parse errors silently (no modal yet)
           if (isJsonErr && parseAttempt < 2) continue;
 
@@ -1553,14 +1579,20 @@ Return ONLY valid JSON (no markdown, no extra text):
           showApiError('Invalid API key','The API key in Setup is invalid or expired.<br><br>Go to <strong>console.anthropic.com → API Keys</strong> to generate a new key.');
         } else {
           // Show a persistent failed-run banner on the report tab so it isn't missed
-          const isJsonErr = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse') ||
-                            msg.toLowerCase().includes('incomplete');
+          const isJsonErr   = msg.toLowerCase().includes('json') || msg.toLowerCase().includes('parse') ||
+                              msg.toLowerCase().includes('incomplete');
+          const isPolicyErr = msg.startsWith('POLICY_ERROR:') || isPolicyError(msg);
           const docName = docInfo.filename || 'this document';
           const wc = docInfo.wordCount ? `${docInfo.wordCount.toLocaleString()}-word ` : '';
           showApiError(
             `Proofread failed — no results saved`,
             `Zero chunks completed on the ${wc}<strong>${esc(docName)}</strong> run.<br><br>`+
-            (isJsonErr
+            (isPolicyErr
+              ? `<strong>Cause:</strong> Anthropic's content safety filter flagged the document content. This is a <strong>false positive</strong> — it commonly occurs with Bengali, Arabic, and other non-Latin scripts.<br><br>`+
+                `<strong>Fix:</strong><br>`+
+                `• Switch to <strong>Sonnet 4.6</strong> — has a more accurate safety classifier<br>`+
+                `• Or try re-running — the filter is not always consistent`
+              : isJsonErr
               ? `<strong>Cause:</strong> The model returned JSON that couldn't be parsed after 3 attempts. This usually means each chunk produced too many errors for the model's output limit.<br><br>`+
                 `<strong>Fix:</strong><br>`+
                 `• Switch to <strong>Sonnet 4.6</strong> — much more reliable JSON output for large, error-heavy documents<br>`+
@@ -1568,7 +1600,7 @@ Return ONLY valid JSON (no markdown, no extra text):
               : `<strong>Error:</strong> ${esc(msg)}<br><br>`+
                 `<strong>Tip:</strong> Try again, or switch to Sonnet 4.6 for more reliable results on large documents`)
           );
-          showTab('report'); // navigate to report so the modal is visible
+          showTab('report');
         }
       }
     }
@@ -1812,6 +1844,10 @@ function saveToHistory(report) {
     score:calculateScore(report),
     summary:report.summary,
     errors:report.errors,
+    model:report._model||null,
+    cost:report._cost||null,
+    inputTok:report._inputTok||null,
+    outputTok:report._outputTok||null,
     docInfoSnap:{...docInfo, pageTexts:[]}, // strip pageTexts — too large for localStorage
   };
   history.unshift(entry);
@@ -1849,7 +1885,7 @@ function renderHistory() {
       </div>
       <div class="hist-info">
         <div class="hist-file" title="${esc(item.filename)}">${esc(item.filename)}</div>
-        <div class="hist-meta">${date} · ${item.language||'—'} · ${(item.wordCount||0).toLocaleString()} words · ${item.totalErrors} issues · ${label}</div>
+        <div class="hist-meta">${date} · ${item.language||'—'} · ${(item.wordCount||0).toLocaleString()} words · ${item.totalErrors} issues · ${label}${item.model?' · '+modelDisplayName(item.model):''}</div>
       </div>
       <div class="hist-actions">
         <button class="btn btn-secondary btn-sm" onclick="loadHistoryItem(${item.id})">View</button>
@@ -1862,7 +1898,12 @@ function loadHistoryItem(id) {
   const item=getHistory().find(h=>h.id===id);
   if (!item) return;
   docInfo={...item.docInfoSnap};
-  lastReport={language:item.language,word_count:item.wordCount,summary:item.summary,errors:item.errors};
+  lastReport={
+    language:item.language, word_count:item.wordCount,
+    summary:item.summary, errors:item.errors,
+    _model:item.model||null, _cost:item.cost||null,
+    _inputTok:item.inputTok||null, _outputTok:item.outputTok||null,
+  };
   renderReport(lastReport);
   showTab('report');
 }
