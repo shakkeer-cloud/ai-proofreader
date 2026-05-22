@@ -1695,13 +1695,13 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
 ${checksLine}
 
 Error type definitions — use EXACTLY these categories, no others:
-- Typos: ONLY exact word-level duplicates where the same word appears twice in a row (e.g. “the the”, “and and”). Do NOT flag: text that appears in both a pull-quote/callout and body text (that is a layout feature); letter-spaced decorative headings (e.g. “K E N A N G A N”); repeated captions or headers. Only flag duplicates within continuous flowing body text.
-- Spelling: misspelled words AND wrong word forms (e.g. “informations” instead of “information”, “childs” instead of “children”). Homophones used incorrectly (there/their/they’re) are also Spelling.
-- Grammar: subject-verb disagreement, wrong verb tense, missing or wrong auxiliary verbs (e.g. “must addressed” → “must address”), run-on sentences, sentence fragments, and awkward or convoluted syntax that impedes understanding.
+- Typos: ONLY exact word-level duplicates where the same word appears twice in a row (e.g. "the the", "and and"). Do NOT flag: text that appears in both a pull-quote/callout and body text (that is a layout feature); letter-spaced decorative headings (e.g. "K E N A N G A N"); repeated captions or headers. Only flag duplicates within continuous flowing body text.
+- Spelling: misspelled words AND wrong word forms (e.g. "informations" instead of "information", "childs" instead of "children"). Homophones used incorrectly (there/their/they're) are also Spelling.
+- Grammar: subject-verb disagreement, wrong verb tense, missing or wrong auxiliary verbs (e.g. "must addressed" → "must address"), run-on sentences, sentence fragments, and awkward or convoluted syntax that impedes understanding.
 - Punctuation: missing or wrong commas, incorrect apostrophes (including missing apostrophes in contractions), missing colons or semicolons, inconsistent quotation mark usage.
 - Capitalization: missing capitalisation of proper nouns (names, cities, countries, days, months, titles) or sentence-starting words; inconsistent capitalisation of the same term across the document.
-- Style: wordy phrases that should be simplified (e.g. “due to the fact that” → “because”), passive voice where active is clearer. Also flag formatting inconsistency: numerals vs words used inconsistently for numbers (e.g. “five delegates” alongside “5 delegates”); inconsistent use of italics or bold for titles and terms.
-- Consistency: the same term, name, title, date, number, or abbreviation written differently in different places (e.g. “CRM” vs “crm”, “e-mail” vs “email”, “H.E.” vs “HE”). Includes: different word order for the same title or designation; abbreviations used before they are defined; content repeated across sentences that adds no new information.
+- Style: wordy phrases that should be simplified (e.g. "due to the fact that" → "because"), passive voice where active is clearer. Also flag formatting inconsistency: numerals vs words used inconsistently for numbers (e.g. "five delegates" alongside "5 delegates"); inconsistent use of italics or bold for titles and terms.
+- Consistency: the same term, name, title, date, number, or abbreviation written differently in different places (e.g. "CRM" vs "crm", "e-mail" vs "email", "H.E." vs "HE"). Includes: different word order for the same title or designation; abbreviations used before they are defined; content repeated across sentences that adds no new information.
 - Clarity: vague or ambiguous wording where the meaning is unclear. Also flag internal contradictions within the text — where two passages state conflicting facts or dates.
 - Factual: wrong person named for a stated role or title (e.g. a speaker described as holding a position they do not hold); a name or title that clearly does not match based on information given elsewhere in the same text. Do NOT fact-check externally — only flag clear internal contradictions or obviously wrong attributions visible within the provided text.
 
@@ -1712,28 +1712,28 @@ Severity rules:
 - Query: The text is likely wrong or inconsistent but you are not 100% certain — flag for author/editor review. Use when you are around 70% confident something is an error but cannot verify without external information. Always explain specifically what to check.
 
 IMPORTANT RULES:
-1. In “original” and “corrected” fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
-2. The text contains “--- Page N ---” markers. Use these to set the “page” field for every error. The “page” field is REQUIRED — every error must have a page number.
+1. In "original" and "corrected" fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
+2. The text contains "--- Page N ---" markers. Use these to set the "page" field for every error. The "page" field is REQUIRED — every error must have a page number.
 3. Explanation rules — STRICT:
    - ONE issue per error entry. Never combine two observations into one row.
    - Start directly with what is WRONG. Never open with what is correct or consistent.
-   - Bad: “The name is spelled consistently; however the pull-quote reads…” — this mixes a non-error with an error.
-   - Good: “Pull-quote adds ‘itu’ not present in body text — inconsistent wording.”
+   - Bad: "The name is spelled consistently; however the pull-quote reads…" — this mixes a non-error with an error.
+   - Good: "Pull-quote adds 'itu' not present in body text — inconsistent wording."
    - Plain English only, even for non-English documents. One sentence maximum.
-4. CERTAINTY RULE: Flag errors you are confident about with the appropriate severity (Critical/Moderate/Minor). For items you believe are likely wrong but cannot verify with certainty, use severity “Query” — do NOT silently omit them. Never write that the text is correct, consistent, or that no error was found.
+4. CERTAINTY RULE: Flag errors you are confident about with the appropriate severity (Critical/Moderate/Minor). For items you believe are likely wrong but cannot verify with certainty, use severity "Query" — do NOT silently omit them. Never write that the text is correct, consistent, or that no error was found.
 5. PDF EXTRACTION ARTEFACTS — these are NOT errors, never flag them:
-   a. Quotation mark shape: curly/smart quotes (‘ ‘ “ “) are often extracted as straight apostrophes (‘ “). Do NOT flag the shape of quotation marks — only flag if an apostrophe is completely missing (e.g. “its” instead of “it’s”).
+   a. Quotation mark shape: curly/smart quotes (' ' " ") are often extracted as straight apostrophes (' "). Do NOT flag the shape of quotation marks — only flag if an apostrophe is completely missing (e.g. "its" instead of "it's").
    b. Text that appears incoherent or uses an unexpected word mid-sentence at a column boundary (e.g. a name suddenly interrupted by an unrelated word) — this is a multi-column extraction artefact. Do NOT flag or attempt to reconstruct such text.
 6. CONTEXT BOUNDARY RULE: Each chunk of text is a partial extract. A sentence may be incomplete at the start or end of a chunk. Do NOT flag missing words or punctuation that you expect to appear outside the provided context. Only flag what you can see.
-7. ORIGINAL FIELD RULE: The “original” field MUST contain the exact substring where the error occurs. It must appear verbatim inside the “context” field. Never put one part of the sentence in “original” while describing an error in a different part of the same sentence.${(()=>{const g=getGlossary();return g.length?`\n8. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(‘, ‘)}.`:’’})()}${rtlNote}${thaiNote}${bengaliNote}${spreadNote}
+7. ORIGINAL FIELD RULE: The "original" field MUST contain the exact substring where the error occurs. It must appear verbatim inside the "context" field. Never put one part of the sentence in "original" while describing an error in a different part of the same sentence.${(()=>{const g=getGlossary();return g.length?`\n8. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}${rtlNote}${thaiNote}${bengaliNote}${spreadNote}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
-  “language”:”<detected language name>”,
-  “word_count”:<int>,
-  “summary”:{“total_errors”:<int>,”Typos”:<int>,”Spelling”:<int>,”Grammar”:<int>,”Punctuation”:<int>,”Capitalization”:<int>,”Style”:<int>,”Consistency”:<int>,”Clarity”:<int>,”Factual”:<int>},
-  “errors”:[{“id”:1,”type”:”<type>”,”severity”:”Critical|Moderate|Minor|Query”,”page”:<int>,”context”:”<sentence containing error, ≤150 chars>”,”original”:”<exact error text, preserve casing>”,”corrected”:”<fix or what to verify>”,”explanation”:”<one plain-English sentence>”}]
-}${extra?’\n\nAdditional instructions:\n’+extra:’’}`;
+  "language":"<detected language name>",
+  "word_count":<int>,
+  "summary":{"total_errors":<int>,"Typos":<int>,"Spelling":<int>,"Grammar":<int>,"Punctuation":<int>,"Capitalization":<int>,"Style":<int>,"Consistency":<int>,"Clarity":<int>,"Factual":<int>},
+  "errors":[{"id":1,"type":"<type>","severity":"Critical|Moderate|Minor|Query","page":<int>,"context":"<sentence containing error, ≤150 chars>","original":"<exact error text, preserve casing>","corrected":"<fix or what to verify>","explanation":"<one plain-English sentence>"}]
+}${extra?'\n\nAdditional instructions:\n'+extra:''}`;
 
   // Build page-aware text with --- Page N --- markers so Claude knows page numbers
   const pagedText = (docInfo.pageTexts.length > 1)
