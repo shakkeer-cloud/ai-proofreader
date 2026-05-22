@@ -195,6 +195,7 @@
     .sev-Critical { color:#ef4444; }
     .sev-Moderate { color:#f97316; }
     .sev-Minor    { color:var(--muted); }
+    .sev-Query    { color:#8b5cf6; }
     .pg-num { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
     .context-snippet { font-size:12px; line-height:1.6; }
     .context-snippet, td { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Arabic', 'Noto Sans Bengali', 'Noto Sans Devanagari', 'Noto Sans Hebrew', 'Noto Sans Tamil', 'Noto Sans Thai', 'Noto Nastaliq Urdu', sans-serif; }
@@ -290,6 +291,7 @@
       .sev-Critical { color:#c00 !important; }
       .sev-Moderate { color:#b45 !important; }
       .sev-Minor { color:#777 !important; }
+      .sev-Query { color:#6d28d9 !important; }
       .check-chip { background:#eee !important; color:#333 !important; border:1px solid #ccc !important; }
       /* Print column widths — fixed layout so explanation gets enough room */
       colgroup col.col-id    { width:28px !important; }
@@ -436,9 +438,15 @@
     <div class="field">
       <label>AI Model</label>
       <select id="model">
-        <option value="claude-sonnet-4-6">Sonnet 4.6 — Fast</option>
-        <option value="claude-opus-4-7">Opus 4.7 — Best</option>
-        <option value="claude-haiku-4-5-20251001">Haiku 4.5 — Fastest</option>
+        <optgroup label="Anthropic Claude">
+          <option value="claude-sonnet-4-6">Sonnet 4.6 — Fast</option>
+          <option value="claude-opus-4-7">Opus 4.7 — Best</option>
+          <option value="claude-haiku-4-5-20251001">Haiku 4.5 — Fastest</option>
+        </optgroup>
+        <optgroup label="OpenAI GPT">
+          <option value="gpt-4o">GPT-4o — Best</option>
+          <option value="gpt-4o-mini">GPT-4o mini — Fast</option>
+        </optgroup>
       </select>
     </div>
     <div style="flex:1;min-width:0"></div>
@@ -577,9 +585,13 @@
 <!-- ══════════ SETUP PAGE ══════════ -->
 <div id="setup-page" class="page">
   <div class="card">
-    <h3>🔑 Anthropic API Key</h3>
+    <h3>🔑 Anthropic API Key <span style="font-size:11px;font-weight:400;color:var(--muted)">(for Claude models)</span></h3>
     <input type="password" id="api-key-input" placeholder="sk-ant-api03-…" autocomplete="off">
     <p class="help">Stored only in your browser's local storage — never sent anywhere except Anthropic's API.<br>Get a key at <strong>console.anthropic.com</strong>.</p>
+    <br>
+    <h3 style="margin-top:14px">🔑 OpenAI API Key <span style="font-size:11px;font-weight:400;color:var(--muted)">(for GPT-4o models)</span></h3>
+    <input type="password" id="openai-key-input" placeholder="sk-proj-…" autocomplete="off">
+    <p class="help">Required only when selecting GPT-4o or GPT-4o mini. Get a key at <strong>platform.openai.com/api-keys</strong>.</p>
     <br>
     <h3 style="margin-top:14px">👤 Your Name</h3>
     <input type="text" id="user-name-input" placeholder="e.g. Shakkeer" autocomplete="off" style="margin-top:6px">
@@ -590,8 +602,9 @@
   <div class="card" style="border-color:rgba(99,102,241,.3)">
     <h3>ℹ️ About</h3>
     <p class="help" style="font-size:12px">
-      Checks for <strong>Typos, Spelling, Grammar, Punctuation, Capitalization, Style, Consistency,</strong> and <strong>Clarity</strong> errors with severity ratings.
+      Checks for <strong>Typos, Spelling, Grammar, Punctuation, Capitalization, Style, Consistency, Clarity,</strong> and <strong>Factual</strong> errors. Query severity flags ambiguous items for author review.
       Supports PDF (single-page &amp; double-page spread), Word (.docx), plain text, paste, and batch upload.
+      Models: Claude Sonnet/Opus/Haiku (Anthropic) and GPT-4o / GPT-4o mini (OpenAI).
       Multi-language: Arabic, Hebrew, Persian (RTL), Bengali, Hindi, Tamil, Thai, Japanese, Korean and all major Latin-script languages.
       Exports: PDF, Word, corrected document, shareable HTML, JSON.
     </p>
@@ -617,7 +630,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.0.7</span>
+  <span class="app-footer-version">v3.0.8</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -663,6 +676,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 const TYPE_COLORS = {
   Typos:'#ff6b35', Spelling:'#ef4444', Grammar:'#f97316', Punctuation:'#eab308',
   Capitalization:'#a855f7', Style:'#3b82f6', Consistency:'#06b6d4', Clarity:'#10b981',
+  Factual:'#f43f5e',
 };
 const ALL_TYPES = Object.keys(TYPE_COLORS);
 const GRADE_CONFIG = [
@@ -675,9 +689,11 @@ const CHUNK_SIZE  = 45000;   // ~16k tokens/chunk — safely under 30k tokens/mi
 const RATE_LIMIT_WAIT_S = 75; // seconds to pause between chunks (generous buffer for sliding window)
 const CHUNK_OVERLAP    = 150; // chars of tail overlap between consecutive chunks to catch boundary errors
 const MODEL_PRICING = {
-  'claude-sonnet-4-6':       { in: 3.00,  out: 15.00 },
-  'claude-opus-4-7':         { in: 15.00, out: 75.00 },
+  'claude-sonnet-4-6':        { in: 3.00,  out: 15.00 },
+  'claude-opus-4-7':          { in: 15.00, out: 75.00 },
   'claude-haiku-4-5-20251001':{ in: 0.80,  out: 4.00  },
+  'gpt-4o':                   { in: 2.50,  out: 10.00 },
+  'gpt-4o-mini':              { in: 0.15,  out: 0.60  },
 };
 function calcCost(model, inputTok, outputTok) {
   const p = MODEL_PRICING[model] || { in: 3.00, out: 15.00 };
@@ -687,6 +703,8 @@ const MODEL_DISPLAY_NAMES = {
   'claude-sonnet-4-6':        'Claude Sonnet 4.6',
   'claude-opus-4-7':          'Claude Opus 4.7',
   'claude-haiku-4-5-20251001':'Claude Haiku 4.5',
+  'gpt-4o':                   'GPT-4o',
+  'gpt-4o-mini':              'GPT-4o mini',
 };
 function modelDisplayName(id) {
   return MODEL_DISPLAY_NAMES[id] || (id ? id.replace('claude-','Claude ') : 'Claude');
@@ -1165,7 +1183,7 @@ function calculateScore(report) {
   const words=Math.max(1, report.word_count||docInfo.wordCount||100);
   let weighted=0;
   (report.errors||[]).forEach(e => {
-    weighted += e.severity==='Critical' ? 3 : e.severity==='Moderate' ? 2 : 1;
+    weighted += e.severity==='Critical' ? 3 : e.severity==='Moderate' ? 2 : e.severity==='Minor' ? 1 : 0; // Query = 0
   });
   const density=weighted/(words/100);
   return Math.max(0,Math.min(100,Math.round(100-density*4)));
@@ -1347,7 +1365,7 @@ function showConfirmModal(file, pasteText, apiKey) {
     : text.length;
   const words = docInfo.wordCount || countWords(text);
   const model = document.getElementById('model').value;
-  const modelNames = { 'claude-sonnet-4-6':'Sonnet 4.6', 'claude-opus-4-7':'Opus 4.7', 'claude-haiku-4-5-20251001':'Haiku 4.5' };
+  const modelNames = { 'claude-sonnet-4-6':'Sonnet 4.6', 'claude-opus-4-7':'Opus 4.7', 'claude-haiku-4-5-20251001':'Haiku 4.5', 'gpt-4o':'GPT-4o', 'gpt-4o-mini':'GPT-4o mini' };
   const numChunks = Math.ceil(pagedLen / CHUNK_SIZE) || 1;
   const estTimeSec = estimateProofreadTime(numChunks);
   const estCost = estimatePreflightCost(text, model, numChunks);
@@ -1370,10 +1388,14 @@ function showConfirmModal(file, pasteText, apiKey) {
   // Smart model tip: RTL/complex scripts benefit from Sonnet; large = Haiku for speed
   const tipEl = document.getElementById('cm-large-doc-tip');
   const isRTL = docInfo.scriptDir === 'rtl';
+  const isOpenAI = model.startsWith('gpt-');
   if (isRTL && model === 'claude-haiku-4-5-20251001') {
     tipEl.innerHTML = '🌐 RTL/complex-script document detected — <strong>Sonnet 4.6</strong> is recommended for best accuracy on Arabic, Hebrew, Bengali, Hindi, and similar scripts.';
     tipEl.style.display = 'block';
-  } else if (numChunks >= 3) {
+  } else if (isOpenAI && numChunks >= 3) {
+    tipEl.innerHTML = '⚡ Large document with GPT — consider <strong>GPT-4o mini</strong> for speed and cost, or <strong>Haiku 4.5</strong> (Claude) which is also very fast.';
+    tipEl.style.display = 'block';
+  } else if (!isOpenAI && numChunks >= 3) {
     tipEl.innerHTML = '⚡ Large document detected — for best results, select <strong>Haiku 4.5</strong> (fastest model, lowest token usage, least likely to hit rate limits).';
     tipEl.style.display = 'block';
   } else {
@@ -1512,11 +1534,49 @@ async function callApiWithRetry(payload, apiKey, ci, total, showUI) {
 }
 
 // ══════════════════════════════════════════════
+// OpenAI API call (GPT-4o / GPT-4o mini)
+// ══════════════════════════════════════════════
+async function callOpenAI(payload, apiKey, ci, total, showUI) {
+  const MAX_RETRIES = 3;
+  const WAIT_S = 30; // OpenAI rate limit wait (shorter than Anthropic)
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await sleepWithCountdown(WAIT_S, s => {
+        if (showUI) {
+          document.getElementById('loading-title').textContent = `Chunk ${ci} of ${total} — rate limited`;
+          document.getElementById('loading-sub').textContent = `Auto-retrying in ${s}s… (attempt ${attempt+1} of ${MAX_RETRIES})`;
+        }
+      });
+    }
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) return res;
+    const e = await res.json().catch(() => ({}));
+    const msg = e.error?.message || `OpenAI API error ${res.status}`;
+    if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES - 1) continue;
+    throw new Error(msg);
+  }
+}
+
+// ══════════════════════════════════════════════
 // Main proofreading flow
 // ══════════════════════════════════════════════
 async function runProofread() {
-  const apiKey = localStorage.getItem('proof_api_key');
-  if (!apiKey) { toast('Set your API key in Setup first.','warn'); showTab('setup'); return; }
+  const selectedModel = document.getElementById('model').value;
+  const isOpenAIModel = selectedModel.startsWith('gpt-');
+  const apiKey = isOpenAIModel
+    ? localStorage.getItem('proof_openai_key')
+    : localStorage.getItem('proof_api_key');
+  if (!apiKey) {
+    toast(`Set your ${isOpenAIModel ? 'OpenAI' : 'Anthropic'} API key in Setup first.`, 'warn');
+    showTab('setup'); return;
+  }
 
   // Request OS notification permission from this user gesture (for background completion alerts)
   requestNotificationPermission();
@@ -1594,6 +1654,7 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
 
   const lang  = document.getElementById('language').value;
   const model = document.getElementById('model').value;
+  const isOpenAIModel = model.startsWith('gpt-');
   const extra = document.getElementById('ai-instructions').value.trim();
 
   const LANG_NAMES={english:'English',arabic:'Arabic',french:'French',spanish:'Spanish',
@@ -1630,47 +1691,49 @@ async function proofreadOne(file, pasteText, apiKey, showOnDone) {
     ? `\nSPREAD NOTE: This is a double-page spread PDF. Text is extracted column by column (left page first, then right page). "--- Page N ---" markers correspond to PDF page numbers, not book pages. Each PDF page contains two book pages side by side.`
     : '';
 
-  const systemPrompt = `You are a professional proofreader. ${langLine}
+  const systemPrompt = `You are a meticulous senior copy editor and proofreader for professionally published books and documents. ${langLine}
 ${checksLine}
 
 Error type definitions — use EXACTLY these categories, no others:
-- Typos: ONLY exact word-level duplicates where the same word appears twice in a row (e.g. "the the", "and and"). Do NOT flag: text that appears in both a pull-quote/callout and body text (that is a layout feature); letter-spaced decorative headings (e.g. "K E N A N G A N"); repeated captions or headers. Only flag duplicates within continuous flowing body text.
-- Spelling: misspelled words AND wrong word forms (e.g. "informations" instead of "information", "childs" instead of "children"). Homophones used incorrectly (there/their/they're) are also Spelling.
-- Grammar: subject-verb disagreement, wrong verb tense, missing or wrong auxiliary verbs (e.g. "must addressed" → "must address"), run-on sentences, sentence fragments.
-- Punctuation: missing or wrong commas, incorrect apostrophes (including missing apostrophes in contractions), missing colons or semicolons.
-- Capitalization: missing capitalisation of proper nouns (names, cities, countries, days, months, titles) or sentence-starting words.
-- Style: wordy phrases that should be simplified (e.g. "due to the fact that" → "because"), passive voice where active is clearer.
-- Consistency: the same term, name, or abbreviation written differently in different places (e.g. "CRM" vs "crm", "e-mail" vs "email"). Also use for content repeated across sentences that adds no new information.
-- Clarity: vague or ambiguous wording where the meaning is unclear.
+- Typos: ONLY exact word-level duplicates where the same word appears twice in a row (e.g. “the the”, “and and”). Do NOT flag: text that appears in both a pull-quote/callout and body text (that is a layout feature); letter-spaced decorative headings (e.g. “K E N A N G A N”); repeated captions or headers. Only flag duplicates within continuous flowing body text.
+- Spelling: misspelled words AND wrong word forms (e.g. “informations” instead of “information”, “childs” instead of “children”). Homophones used incorrectly (there/their/they’re) are also Spelling.
+- Grammar: subject-verb disagreement, wrong verb tense, missing or wrong auxiliary verbs (e.g. “must addressed” → “must address”), run-on sentences, sentence fragments, and awkward or convoluted syntax that impedes understanding.
+- Punctuation: missing or wrong commas, incorrect apostrophes (including missing apostrophes in contractions), missing colons or semicolons, inconsistent quotation mark usage.
+- Capitalization: missing capitalisation of proper nouns (names, cities, countries, days, months, titles) or sentence-starting words; inconsistent capitalisation of the same term across the document.
+- Style: wordy phrases that should be simplified (e.g. “due to the fact that” → “because”), passive voice where active is clearer. Also flag formatting inconsistency: numerals vs words used inconsistently for numbers (e.g. “five delegates” alongside “5 delegates”); inconsistent use of italics or bold for titles and terms.
+- Consistency: the same term, name, title, date, number, or abbreviation written differently in different places (e.g. “CRM” vs “crm”, “e-mail” vs “email”, “H.E.” vs “HE”). Includes: different word order for the same title or designation; abbreviations used before they are defined; content repeated across sentences that adds no new information.
+- Clarity: vague or ambiguous wording where the meaning is unclear. Also flag internal contradictions within the text — where two passages state conflicting facts or dates.
+- Factual: wrong person named for a stated role or title (e.g. a speaker described as holding a position they do not hold); a name or title that clearly does not match based on information given elsewhere in the same text. Do NOT fact-check externally — only flag clear internal contradictions or obviously wrong attributions visible within the provided text.
 
 Severity rules:
-- Critical: Typos (always), misspellings, wrong word forms, wrong homophones, broken grammar that affects meaning.
-- Moderate: Clear errors that distract but do not change meaning (wrong punctuation, capitalisation, consistency).
+- Critical: Typos (always), misspellings, wrong word forms, wrong homophones, broken grammar that affects meaning, wrong person named for a role.
+- Moderate: Clear errors that distract but do not change meaning (wrong punctuation, capitalisation, consistency, factual contradictions).
 - Minor: Style preferences, clarity suggestions.
+- Query: The text is likely wrong or inconsistent but you are not 100% certain — flag for author/editor review. Use when you are around 70% confident something is an error but cannot verify without external information. Always explain specifically what to check.
 
 IMPORTANT RULES:
-1. In "original" and "corrected" fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
-2. The text contains "--- Page N ---" markers. Use these to set the "page" field for every error. The "page" field is REQUIRED — every error must have a page number.
+1. In “original” and “corrected” fields, reproduce the exact text exactly as it appears in the document — do NOT change capitalisation, spacing, or punctuation.
+2. The text contains “--- Page N ---” markers. Use these to set the “page” field for every error. The “page” field is REQUIRED — every error must have a page number.
 3. Explanation rules — STRICT:
    - ONE issue per error entry. Never combine two observations into one row.
    - Start directly with what is WRONG. Never open with what is correct or consistent.
-   - Bad: "The name is spelled consistently; however the pull-quote reads…" — this mixes a non-error with an error.
-   - Good: "Pull-quote adds 'itu' not present in body text — inconsistent wording."
-   - Max 15 words. Plain English only, even for non-English documents.
-4. CERTAINTY RULE: Only flag errors you are 100% certain about. If you are in any doubt, do NOT flag it. Never write that the text is correct, consistent, or that no error was found.
+   - Bad: “The name is spelled consistently; however the pull-quote reads…” — this mixes a non-error with an error.
+   - Good: “Pull-quote adds ‘itu’ not present in body text — inconsistent wording.”
+   - Plain English only, even for non-English documents. One sentence maximum.
+4. CERTAINTY RULE: Flag errors you are confident about with the appropriate severity (Critical/Moderate/Minor). For items you believe are likely wrong but cannot verify with certainty, use severity “Query” — do NOT silently omit them. Never write that the text is correct, consistent, or that no error was found.
 5. PDF EXTRACTION ARTEFACTS — these are NOT errors, never flag them:
-   a. Quotation mark shape: curly/smart quotes (‘ ’ “ ”) are often extracted as straight apostrophes (' "). Do NOT flag the shape of quotation marks — only flag if an apostrophe is completely missing (e.g. "its" instead of "it's").
+   a. Quotation mark shape: curly/smart quotes (‘ ‘ “ “) are often extracted as straight apostrophes (‘ “). Do NOT flag the shape of quotation marks — only flag if an apostrophe is completely missing (e.g. “its” instead of “it’s”).
    b. Text that appears incoherent or uses an unexpected word mid-sentence at a column boundary (e.g. a name suddenly interrupted by an unrelated word) — this is a multi-column extraction artefact. Do NOT flag or attempt to reconstruct such text.
 6. CONTEXT BOUNDARY RULE: Each chunk of text is a partial extract. A sentence may be incomplete at the start or end of a chunk. Do NOT flag missing words or punctuation that you expect to appear outside the provided context. Only flag what you can see.
-7. ORIGINAL FIELD RULE: The "original" field MUST contain the exact substring where the error occurs. It must appear verbatim inside the "context" field. Never put one part of the sentence in "original" while describing an error in a different part of the same sentence.${(()=>{const g=getGlossary();return g.length?`\n8. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(', ')}.`:''})()}${rtlNote}${thaiNote}${bengaliNote}${spreadNote}
+7. ORIGINAL FIELD RULE: The “original” field MUST contain the exact substring where the error occurs. It must appear verbatim inside the “context” field. Never put one part of the sentence in “original” while describing an error in a different part of the same sentence.${(()=>{const g=getGlossary();return g.length?`\n8. CUSTOM GLOSSARY — Never flag any of these as errors under any circumstances: ${g.join(‘, ‘)}.`:’’})()}${rtlNote}${thaiNote}${bengaliNote}${spreadNote}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
-  "language":"<detected language name>",
-  "word_count":<int>,
-  "summary":{"total_errors":<int>,"Typos":<int>,"Spelling":<int>,"Grammar":<int>,"Punctuation":<int>,"Capitalization":<int>,"Style":<int>,"Consistency":<int>,"Clarity":<int>},
-  "errors":[{"id":1,"type":"<type>","severity":"Critical|Moderate|Minor","page":<int>,"context":"<sentence containing error, ≤150 chars>","original":"<exact error text, preserve casing>","corrected":"<fix>","explanation":"<one plain-English sentence>"}]
-}${extra?'\n\nAdditional instructions:\n'+extra:''}`;
+  “language”:”<detected language name>”,
+  “word_count”:<int>,
+  “summary”:{“total_errors”:<int>,”Typos”:<int>,”Spelling”:<int>,”Grammar”:<int>,”Punctuation”:<int>,”Capitalization”:<int>,”Style”:<int>,”Consistency”:<int>,”Clarity”:<int>,”Factual”:<int>},
+  “errors”:[{“id”:1,”type”:”<type>”,”severity”:”Critical|Moderate|Minor|Query”,”page”:<int>,”context”:”<sentence containing error, ≤150 chars>”,”original”:”<exact error text, preserve casing>”,”corrected”:”<fix or what to verify>”,”explanation”:”<one plain-English sentence>”}]
+}${extra?’\n\nAdditional instructions:\n’+extra:’’}`;
 
   // Build page-aware text with --- Page N --- markers so Claude knows page numbers
   const pagedText = (docInfo.pageTexts.length > 1)
@@ -1752,20 +1815,35 @@ Return ONLY valid JSON (no markdown, no extra text):
             ? Math.min(4096, Math.max(1500, Math.round(chunkWords / 3)))
             : Math.min(8000, Math.max(2000, Math.round(chunkWords / 2)));
 
-          const res = await callApiWithRetry({
-            model, max_tokens:adaptiveMaxTok, temperature:0,
-            system:[{type:'text', text:systemPrompt, cache_control:{type:'ephemeral'}}],
-            messages:[{role:'user', content:
-              `Proofread this text${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`}]
-          }, apiKey, ci+1, chunks.length, showOnDone);
+          const userMsg = `Proofread this text${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}:\n\n${chunks[ci]}`;
+          const res = isOpenAIModel
+            ? await callOpenAI({
+                model, temperature: 0,
+                response_format: { type: 'json_object' },
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user',   content: userMsg }
+                ]
+              }, apiKey, ci+1, chunks.length, showOnDone)
+            : await callApiWithRetry({
+                model, max_tokens: adaptiveMaxTok, temperature: 0,
+                system: [{ type:'text', text:systemPrompt, cache_control:{ type:'ephemeral' } }],
+                messages: [{ role:'user', content: userMsg }]
+              }, apiKey, ci+1, chunks.length, showOnDone);
 
           const data = await res.json();
-          console.debug('[Proofreader] chunk', ci+1, 'attempt', parseAttempt+1, '— raw:', data.content[0].text.slice(0, 200));
-          const chunk_report = parseClaudeJSON(data.content[0].text);
+          const rawText = isOpenAIModel
+            ? (data.choices?.[0]?.message?.content || '{}')
+            : (data.content?.[0]?.text || '{}');
+          console.debug('[Proofreader] chunk', ci+1, 'attempt', parseAttempt+1, '— raw:', rawText.slice(0, 200));
+          const chunk_report = parseClaudeJSON(rawText);
 
           if (!detectedLang && chunk_report.language) detectedLang = chunk_report.language;
           if (chunk_report.word_count) totalWordCount += chunk_report.word_count;
-          if (data.usage) { totalInputTok += data.usage.input_tokens||0; totalOutputTok += data.usage.output_tokens||0; }
+          if (data.usage) {
+            totalInputTok  += isOpenAIModel ? (data.usage.prompt_tokens||0)     : (data.usage.input_tokens||0);
+            totalOutputTok += isOpenAIModel ? (data.usage.completion_tokens||0) : (data.usage.output_tokens||0);
+          }
 
           const idOffset = allErrors.length;
           // Filter out self-contradicting errors (Claude flagged something but explanation says no error)
@@ -2037,9 +2115,9 @@ function renderReport(r) {
   addStatCard(grid, r.summary.total_errors,'Total Issues','var(--accent)');
   ALL_TYPES.forEach(t=>{ if ((r.summary[t]||0)>0) addStatCard(grid,r.summary[t],t,TYPE_COLORS[t]); });
   // Stats — by severity
-  const sevCounts={Critical:0,Moderate:0,Minor:0};
+  const sevCounts={Critical:0,Moderate:0,Minor:0,Query:0};
   (r.errors||[]).forEach(e=>{if(e.severity&&sevCounts[e.severity]!==undefined)sevCounts[e.severity]++;});
-  const SEV_COLORS_STAT={Critical:'#ef4444',Moderate:'#f97316',Minor:'#94a3b8'};
+  const SEV_COLORS_STAT={Critical:'#ef4444',Moderate:'#f97316',Minor:'#94a3b8',Query:'#8b5cf6'};
   const sdiv=document.createElement('div');
   sdiv.style.cssText='grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:4px';
   sdiv.innerHTML='<span style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">By Severity</span><div style="flex:1;height:1px;background:var(--border)"></div>';
@@ -2083,8 +2161,8 @@ function buildFilters(r) {
   // Severity filter
   const sevBar=document.getElementById('sev-filter-bar');
   sevBar.innerHTML='';
-  const SEV_COLORS={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8'};
-  const presentSevs=['Critical','Moderate','Minor'].filter(s=>errors.some(e=>e.severity===s));
+  const SEV_COLORS={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8','Query':'#8b5cf6'};
+  const presentSevs=['Critical','Moderate','Minor','Query'].filter(s=>errors.some(e=>e.severity===s));
   if (presentSevs.length<2) { sevBar.style.display='none'; }
   else {
     sevBar.style.display='flex';
@@ -2105,7 +2183,7 @@ function syncFilters(r) {
     const on=b.dataset.type==='all'?activeFilters.size===0:activeFilters.has(b.dataset.type);
     b.classList.toggle('on',on); b.style.background=on?(b.dataset.type==='all'?'var(--accent)':TYPE_COLORS[b.dataset.type]):'';
   });
-  const SEV_COLORS={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8'};
+  const SEV_COLORS={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8','Query':'#8b5cf6'};
   document.querySelectorAll('.sev-btn').forEach(b=>{
     const on=b.dataset.type==='all'?activeSevFilter.size===0:activeSevFilter.has(b.dataset.type);
     b.classList.toggle('on',on); b.style.background=on?(b.dataset.type==='all'?'#64748b':SEV_COLORS[b.dataset.type]):'';
@@ -2124,7 +2202,7 @@ function renderTable(errors) {
   if (!errors.length) { tbody.innerHTML=`<tr><td colspan="${hasPages?7:6}" style="text-align:center;padding:28px;color:var(--muted)">🎉 No issues in this category.</td></tr>`; return; }
   errors.forEach(e=>{
     const c=TYPE_COLORS[e.type]||'#94a3b8';
-    const sevCls=e.severity==='Critical'?'sev-Critical':e.severity==='Moderate'?'sev-Moderate':'sev-Minor';
+    const sevCls=e.severity==='Critical'?'sev-Critical':e.severity==='Moderate'?'sev-Moderate':e.severity==='Query'?'sev-Query':'sev-Minor';
     const triage=errorTriageState[e.id]||'';
     const tr=document.createElement('tr');
     if (triage==='fixed') tr.classList.add('row-fixed');
@@ -2408,12 +2486,12 @@ async function downloadPDF() {
     });
     // Summary by severity
     y+=6;
-    const sevCounts={Critical:0,Moderate:0,Minor:0};
+    const sevCounts={Critical:0,Moderate:0,Minor:0,Query:0};
     (lastReport.errors||[]).forEach(e=>{if(e.severity&&sevCounts[e.severity]!==undefined)sevCounts[e.severity]++;});
     doc.setFont('helvetica','bold'); doc.setFontSize(10); gg(30);
     doc.text('Summary by severity',ML,y); y+=5;
     doc.setFontSize(8); let sx2=ML;
-    [['Critical','#ef4444'],['Moderate','#f97316'],['Minor','#94a3b8']].forEach(([sev,hex])=>{
+    [['Critical','#ef4444'],['Moderate','#f97316'],['Minor','#94a3b8'],['Query','#8b5cf6']].forEach(([sev,hex])=>{
       const cnt=sevCounts[sev];
       const [r2,g2,b2]=rgb(hex);
       doc.setFont('helvetica','bold'); gc(r2,g2,b2); const tw=doc.getTextWidth(`${sev}: `);
@@ -2434,7 +2512,7 @@ async function downloadPDF() {
     let cx=ML; HEADS.forEach((h,i)=>{ doc.text(h,cx,y); cx+=COLS[i]; });
     y+=2; ln(y,180); y+=3;
     doc.setFontSize(7.5);
-    const SEV_HEX={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8'};
+    const SEV_HEX={'Critical':'#ef4444','Moderate':'#f97316','Minor':'#94a3b8','Query':'#8b5cf6'};
     (lastReport.errors||[]).forEach(e=>{
       if(y>272){doc.addPage();y=14;}
       const sCol=hasPages?4:3, cCol=hasPages?5:4, xCol=hasPages?6:5;
@@ -2495,7 +2573,7 @@ async function downloadWord() {
     const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const score=calculateScore(r); const [,grade,,label]=getGrade(score);
     const hexToDocx=(hex)=>hex.replace('#','');
-    const SEV_HEX={'Critical':'ef4444','Moderate':'f97316','Minor':'94a3b8'};
+    const SEV_HEX={'Critical':'ef4444','Moderate':'f97316','Minor':'94a3b8','Query':'8b5cf6'};
     const FONT = getExportFont(r.language || docInfo.language);
     const lb={style:BorderStyle.SINGLE,size:1,color:'E5E5E5'};
     const brd={top:lb,bottom:lb,left:lb,right:lb};
@@ -2527,9 +2605,9 @@ async function downloadWord() {
       cell(e.explanation||'',{color:'444444'}),
     ]}));
     const sumPs=ALL_TYPES.filter(t=>(r.summary[t]||0)>0).map(t=>new Paragraph({children:[new TextRun({text:`${t}: `,bold:true,color:hexToDocx(TYPE_COLORS[t]),font:FONT,size:16}),new TextRun({text:String(r.summary[t]),color:'222222',font:FONT,size:16})],spacing:{after:60}}));
-    const sevCounts={Critical:0,Moderate:0,Minor:0};
+    const sevCounts={Critical:0,Moderate:0,Minor:0,Query:0};
     r.errors.forEach(e=>{if(e.severity&&sevCounts[e.severity]!==undefined)sevCounts[e.severity]++;});
-    const sevPs=[new Paragraph({children:['Critical','Moderate','Minor'].flatMap(sev=>[new TextRun({text:`${sev}: `,bold:true,color:SEV_HEX[sev],font:FONT,size:16}),new TextRun({text:`${sevCounts[sev]}   `,color:'222222',font:FONT,size:16})]),spacing:{after:60}})];
+    const sevPs=[new Paragraph({children:['Critical','Moderate','Minor','Query'].flatMap(sev=>[new TextRun({text:`${sev}: `,bold:true,color:SEV_HEX[sev],font:FONT,size:16}),new TextRun({text:`${sevCounts[sev]}   `,color:'222222',font:FONT,size:16})]),spacing:{after:60}})];
     const wordMetaParts2=[];
     if (r._cost) wordMetaParts2.push(`AI cost: $${r._cost.toFixed(4)}`);
     if (r._model) wordMetaParts2.push(`Model: ${modelDisplayName(r._model)}`);
@@ -2685,8 +2763,10 @@ function toast(msg,type,ms) {
 }
 function saveSetup() {
   const k=document.getElementById('api-key-input').value.trim();
-  if (!k) { toast('Please enter your API key.','warn'); return; }
-  localStorage.setItem('proof_api_key', k);
+  const ok=document.getElementById('openai-key-input').value.trim();
+  if (!k && !ok) { toast('Please enter at least one API key.','warn'); return; }
+  if (k) localStorage.setItem('proof_api_key', k);
+  if (ok) localStorage.setItem('proof_openai_key', ok);
   const name = document.getElementById('user-name-input').value.trim();
   if (name) localStorage.setItem('proof_user_name', name);
   toast('Settings saved!'); showTab('proof');
@@ -3164,7 +3244,9 @@ function updateCostFooter() {
 (function init() {
   const k=localStorage.getItem('proof_api_key');
   if (k) document.getElementById('api-key-input').value=k;
-  else setTimeout(()=>showTab('setup'),200);
+  const ok=localStorage.getItem('proof_openai_key');
+  if (ok) document.getElementById('openai-key-input').value=ok;
+  if (!k && !ok) setTimeout(()=>showTab('setup'),200);
   const t=localStorage.getItem('proof_theme')||'dark';
   document.documentElement.dataset.theme=t;
   document.getElementById('theme-btn').textContent=t==='light'?'☀️':'🌙';
