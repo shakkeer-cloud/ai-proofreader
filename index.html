@@ -630,7 +630,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.1.1</span>
+  <span class="app-footer-version">v3.1.2</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1826,7 +1826,7 @@ Return ONLY valid JSON (no markdown, no extra text):
                 ]
               }, apiKey, ci+1, chunks.length, showOnDone)
             : await callApiWithRetry({
-                model, max_tokens: adaptiveMaxTok, temperature: 0,
+                model, max_tokens: adaptiveMaxTok,
                 system: [{ type:'text', text:systemPrompt, cache_control:{ type:'ephemeral' } }],
                 messages: [{ role:'user', content: userMsg }]
               }, apiKey, ci+1, chunks.length, showOnDone);
@@ -2950,7 +2950,7 @@ async function retryFailedChunks() {
             : Math.min(8000, Math.max(2000, Math.round(chunkWords2 / 2)));
 
           const res = await callApiWithRetry({
-            model, max_tokens:adaptiveMaxTok2, temperature:0,
+            model, max_tokens:adaptiveMaxTok2,
             system:[{type:'text', text:systemPrompt, cache_control:{type:'ephemeral'}}],
             messages:[{role:'user', content:
               `Proofread this text (part ${ci+1} of ${chunks.length}):\n\n${chunks[ci]}`}]
