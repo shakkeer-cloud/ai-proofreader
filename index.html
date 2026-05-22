@@ -617,7 +617,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.0.5</span>
+  <span class="app-footer-version">v3.0.6</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -2260,8 +2260,39 @@ function loadHistoryItem(id) {
 // ══════════════════════════════════════════════
 // PDF export — greyscale
 // ══════════════════════════════════════════════
+// Returns true for scripts that jsPDF's built-in Helvetica cannot render
+// (Indic, RTL, CJK, Cyrillic, Thai). Latin-script languages are fine.
+function isPDFUnsupportedLang(lang) {
+  if (!lang) return false;
+  const l = lang.toLowerCase();
+  return /bengali|hindi|devanagari|tamil|malayalam|telugu|kannada|arabic|persian|urdu|hebrew|thai|japanese|korean|chinese|mandarin|russian|mongolian|uzbek|indic/.test(l);
+}
+
+// Returns the best DOCX font for the document language.
+// On Windows these are standard system fonts; Word substitutes on macOS.
+function getExportFont(lang) {
+  const l = (lang||'').toLowerCase();
+  if (/bengali/.test(l))              return 'Shonar Bangla';    // Windows Bengali
+  if (/hindi|devanagari/.test(l))     return 'Mangal';           // Windows Devanagari
+  if (/malayalam/.test(l))            return 'Kartika';          // Windows Malayalam
+  if (/tamil/.test(l))                return 'Latha';            // Windows Tamil
+  if (/arabic|persian|urdu/.test(l))  return 'Arial';            // Arial covers Arabic
+  if (/hebrew/.test(l))               return 'Arial';
+  if (/thai/.test(l))                 return 'Tahoma';           // Tahoma covers Thai
+  if (/japanese/.test(l))             return 'MS Gothic';
+  if (/korean/.test(l))               return 'Malgun Gothic';
+  if (/mandarin|chinese/.test(l))     return 'SimSun';
+  if (/russian|mongolian|uzbek/.test(l)) return 'Arial';         // Arial covers Cyrillic
+  return 'Arial';
+}
+
 async function downloadPDF() {
   if (!lastReport) return;
+  const reportLang = lastReport.language || docInfo.language || '';
+  // Warn user before generating if the script can't render in PDF
+  if (isPDFUnsupportedLang(reportLang)) {
+    toast(`⚠️ PDF export cannot display ${reportLang} characters (font limitation). Original/Corrected text will appear as boxes. Use the Word export instead for readable ${reportLang} text.`, 'warn', 7000);
+  }
   toast('Generating PDF…');
   try {
     const {jsPDF}=window.jspdf;
@@ -2297,6 +2328,19 @@ async function downloadPDF() {
     if (lastReport._model) pdfCostParts.push(`Model: ${modelDisplayName(lastReport._model)}`);
     if (pdfCostParts.length) { doc.setFontSize(7); gg(150); doc.text(pdfCostParts.join('   ·   '),ML,y+2); y+=3; }
     y+=4; ln(y); y+=5;
+
+    // Non-Latin script warning banner — Helvetica cannot render non-Latin Unicode
+    if (isPDFUnsupportedLang(reportLang)) {
+      const warnH = 14;
+      doc.setFillColor(255,243,205); doc.roundedRect(ML, y, CW, warnH, 2, 2, 'F');
+      doc.setDrawColor(230,180,40); doc.roundedRect(ML, y, CW, warnH, 2, 2, 'S');
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); gc(120,80,0);
+      doc.text(`⚠  ${reportLang} text cannot display in PDF`, ML+4, y+5);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); gc(100,70,0);
+      doc.text('The PDF font (Helvetica) does not support this script. Original and Corrected columns show placeholder characters.', ML+4, y+9.5);
+      doc.text('Please use the Word (.docx) export for readable text in the Original and Corrected columns.', ML+4, y+13);
+      y += warnH + 5;
+    }
 
     // Summary by type
     doc.setFont('helvetica','bold'); doc.setFontSize(10); gg(30);
@@ -2398,7 +2442,7 @@ async function downloadWord() {
     const score=calculateScore(r); const [,grade,,label]=getGrade(score);
     const hexToDocx=(hex)=>hex.replace('#','');
     const SEV_HEX={'Critical':'ef4444','Moderate':'f97316','Minor':'94a3b8'};
-    const FONT='Arial';
+    const FONT = getExportFont(r.language || docInfo.language);
     const lb={style:BorderStyle.SINGLE,size:1,color:'E5E5E5'};
     const brd={top:lb,bottom:lb,left:lb,right:lb};
     const cm={top:80,bottom:80,left:120,right:120};
@@ -2580,10 +2624,10 @@ function showApiError(title, body) {
   document.getElementById('api-error-body').innerHTML = body;
   document.getElementById('api-error-modal').classList.add('open');
 }
-function toast(msg,type) {
+function toast(msg,type,ms) {
   const el=document.getElementById('toast'); el.textContent=msg;
   el.style.borderColor=type==='err'?'#ef4444':type==='warn'?'#f97316':'var(--accent)';
-  el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),4000);
+  el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),ms||4000);
 }
 function saveSetup() {
   const k=document.getElementById('api-key-input').value.trim();
