@@ -630,7 +630,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.1.2</span>
+  <span class="app-footer-version">v3.1.3</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1754,6 +1754,10 @@ Return ONLY valid JSON (no markdown, no extra text):
   ALL_TYPES.forEach(t => summaryTotals[t] = 0);
   let completedChunks = 0, partialFromChunk = -1, lastChunkErr = null;
 
+  // Snapshot docInfo NOW so the report meta survives navigation to a history
+  // item (which overwrites the global docInfo) while this run is in progress.
+  const docInfoSnap = {...docInfo};
+
   // Mark job as in-progress so an interrupted run is detectable on next load
   try {
     localStorage.setItem('proof_in_progress', JSON.stringify({
@@ -1866,8 +1870,8 @@ Return ONLY valid JSON (no markdown, no extra text):
               ALL_TYPES.forEach(t => interimTotals[t] = 0);
               allErrors.forEach(e => { if (interimTotals[e.type] !== undefined) interimTotals[e.type]++; });
               const interimReport = {
-                language: detectedLang || docInfo.language,
-                word_count: docInfo.wordCount || totalWordCount,
+                language: detectedLang || docInfoSnap.language,
+                word_count: docInfoSnap.wordCount || totalWordCount,
                 summary: { total_errors: allErrors.length, ...interimTotals },
                 errors: [...allErrors],
                 _checks: selectedChecks.size > 0 ? [...selectedChecks] : null,
@@ -1875,6 +1879,7 @@ Return ONLY valid JSON (no markdown, no extra text):
                 _model: model,
                 _cost: calcCost(model, totalInputTok, totalOutputTok),
                 _partial: { completed: completedChunks, total: chunks.length },
+                _docInfo: docInfoSnap,
               };
               _retryState = { chunks, startChunkIdx: completedChunks, model, systemPrompt };
               lastReport = interimReport;
@@ -1951,14 +1956,15 @@ Return ONLY valid JSON (no markdown, no extra text):
       finalErrors.forEach(e => { if (finalTotals[e.type] !== undefined) finalTotals[e.type]++; });
       const summary = { total_errors: finalErrors.length, ...finalTotals };
       const report = {
-        language: detectedLang || docInfo.language,
-        word_count: docInfo.wordCount || totalWordCount, // client-side count is authoritative
+        language: detectedLang || docInfoSnap.language,
+        word_count: docInfoSnap.wordCount || totalWordCount, // client-side count is authoritative
         summary, errors: finalErrors,
         _checks: selectedChecks.size > 0 ? [...selectedChecks] : null,
         _inputTok: totalInputTok, _outputTok: totalOutputTok,
         _model: model,
         _cost: calcCost(model, totalInputTok, totalOutputTok),
         _partial: partialFromChunk > 0 ? { completed: completedChunks, total: chunks.length } : null,
+        _docInfo: docInfoSnap,
       };
       lastReport = report;
       errorTriageState = {};
@@ -2056,14 +2062,17 @@ function renderReport(r) {
     if (ib) ib.remove();
   }
 
-  // Meta — use client-side word count as authoritative
+  // Meta — read from the report's own docInfo snapshot when present, so the
+  // headings always match the report being shown (even if the global docInfo
+  // was overwritten by a history click while a background proofread was running).
+  const di = r._docInfo || docInfo;
   const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
   const parts=[date];
-  if (r.language||docInfo.language) parts.push(r.language||docInfo.language);
-  const wc = docInfo.wordCount || r.word_count;
+  if (r.language||di.language) parts.push(r.language||di.language);
+  const wc = di.wordCount || r.word_count;
   if (wc) parts.push(`${wc.toLocaleString()} words`);
-  if (docInfo.pages) parts.push(`${docInfo.pages} pages`);
-  if (docInfo.filename) parts.push(docInfo.filename);
+  if (di.pages) parts.push(`${di.pages} pages`);
+  if (di.filename) parts.push(di.filename);
   const initiator = localStorage.getItem('proof_user_name');
   if (initiator) parts.push(`Initiated by: ${initiator}`);
   document.getElementById('report-meta').textContent=parts.join(' · ');
@@ -2073,7 +2082,7 @@ function renderReport(r) {
   const modelName = modelDisplayName(r._model);
   if (r._cost != null) {
     const usd = r._cost < 0.01 ? `$${r._cost.toFixed(4)}` : `$${r._cost.toFixed(3)}`;
-    const words = docInfo.wordCount || r.word_count || 0;
+    const words = di.wordCount || r.word_count || 0;
     const per1k = words > 0 ? (r._cost / words * 1000) : 0;
     const per1kStr = per1k > 0 ? ` · $${per1k < 0.01 ? per1k.toFixed(4) : per1k.toFixed(3)}/1k words` : '';
     costEl.textContent=`AI cost: ${usd}${per1kStr} · ${(r._inputTok||0).toLocaleString()} in + ${(r._outputTok||0).toLocaleString()} out tokens · ${modelName}`;
@@ -2330,6 +2339,7 @@ function loadHistoryItem(id) {
     summary:item.summary, errors:item.errors,
     _model:item.model||null, _cost:item.cost||null,
     _inputTok:item.inputTok||null, _outputTok:item.outputTok||null,
+    _docInfo:{...item.docInfoSnap}, // pin meta to this report so a later re-render is stable
   };
   renderReport(lastReport);
   showTab('report');
@@ -3092,6 +3102,8 @@ function loadSavedReport() {
     if (Date.now() - ts > 24 * 3600 * 1000) return; // expire after 24 h
     lastReport = report;
     docInfo = di;
+    // Backfill _docInfo on older saved reports so re-render is stable across history navigation
+    if (lastReport && !lastReport._docInfo) lastReport._docInfo = {...di};
 
     // Rebuild _retryState — pageTexts now stored in separate key to save quota
     if (report._partial && retryInfo) {
