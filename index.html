@@ -630,7 +630,7 @@
 <footer class="app-footer">
   <span>© 2026 Explorer Publishing &amp; Distribution LLC · All rights reserved</span>
   <span id="cost-footer" style="font-size:10px;color:var(--muted);opacity:.65"></span>
-  <span class="app-footer-version">v3.1.3</span>
+  <span class="app-footer-version">v3.1.4</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -2269,13 +2269,16 @@ async function copyText(text, btn) {
 // ══════════════════════════════════════════════
 function saveToHistory(report) {
   const history=getHistory();
+  // Prefer the report's own docInfo snapshot — the global may have been
+  // clobbered by a history click while this background run was finishing.
+  const di = report._docInfo || docInfo;
   const entry={
     id:Date.now(),
     date:new Date().toISOString(),
-    filename:docInfo.filename||'Pasted text',
-    language:report.language||docInfo.language||'',
-    wordCount:report.word_count||docInfo.wordCount||0,
-    pages:docInfo.pages||null,
+    filename:di.filename||'Pasted text',
+    language:report.language||di.language||'',
+    wordCount:report.word_count||di.wordCount||0,
+    pages:di.pages||null,
     totalErrors:report.summary.total_errors,
     score:calculateScore(report),
     summary:report.summary,
@@ -2284,7 +2287,7 @@ function saveToHistory(report) {
     cost:report._cost||null,
     inputTok:report._inputTok||null,
     outputTok:report._outputTok||null,
-    docInfoSnap:{...docInfo, pageTexts:[]}, // strip pageTexts — too large for localStorage
+    docInfoSnap:{...di, pageTexts:[]}, // strip pageTexts — too large for localStorage
   };
   history.unshift(entry);
   if (history.length>20) history.pop();
